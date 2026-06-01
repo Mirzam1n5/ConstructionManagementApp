@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, createContext, useContext } from 'react';
 import { SHEET_ID } from '../constants';
 
 // ─── Types ───────────────────────────────────────────────────────
@@ -121,6 +121,13 @@ export interface SheetData {
   dailyReports: DailyReport[];
 }
 
+export interface SheetDataState {
+  data: SheetData | null;
+  loading: boolean;
+  error: string | null;
+  refresh: () => void;
+}
+
 // ─── Fetch helpers ───────────────────────────────────────────────
 function sheetUrl(sheetName: string): string {
   const encoded = encodeURIComponent(sheetName);
@@ -131,7 +138,6 @@ async function fetchSheet<T>(sheetName: string): Promise<T[]> {
   const url = sheetUrl(sheetName);
   const res = await fetch(url);
   const text = await res.text();
-  // Google wraps response in /*O_o*/\ngoogle.visualization.Query.setResponse({...});
   const json = JSON.parse(text.substring(47, text.length - 2));
   const cols: string[] = json.table.cols.map((c: any) => c.label as string);
   const rows: T[] = json.table.rows
@@ -147,8 +153,16 @@ async function fetchSheet<T>(sheetName: string): Promise<T[]> {
   return rows;
 }
 
-// ─── Main hook ───────────────────────────────────────────────────
-export function useSheetData() {
+// ─── Context ─────────────────────────────────────────────────────
+export const SheetDataContext = createContext<SheetDataState>({
+  data: null,
+  loading: true,
+  error: null,
+  refresh: () => {},
+});
+
+// ─── Provider hook (used once in _layout.tsx) ────────────────────
+export function useSheetDataProvider(): SheetDataState {
   const [data, setData] = useState<SheetData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -179,4 +193,9 @@ export function useSheetData() {
   useEffect(() => { load(); }, [load]);
 
   return { data, loading, error, refresh: load };
+}
+
+// ─── Consumer hook (used in screens) ─────────────────────────────
+export function useSheetData(): SheetDataState {
+  return useContext(SheetDataContext);
 }
