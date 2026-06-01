@@ -1,0 +1,58 @@
+# Dependencies
+node_modules/
+npm-debug.log
+yarn-error.log
+package-lock.json
+yarn.lock
+
+# Expo/React Native
+.expo/
+.expo-shared/
+dist/
+build/
+*.jks
+*.p8
+*.p12
+*.p7b
+*.pem
+*.pfx
+*.cer
+*.crt
+*.key
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*.swn
+*.iml
+.eslintcache
+.eslintignore
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Cache
+*.log
+.cache/
+.parcel-cache/
+.next/
+out/
+
+# Build outputs
+dist/
+build/
+.turbo/
