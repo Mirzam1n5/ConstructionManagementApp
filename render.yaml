@@ -4,6 +4,9 @@ services:
     runtime: node
     buildCommand: npm install && npm run build:web
     staticPublishPath: dist
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
     routes:
       - type: rewrite
         source: /*
