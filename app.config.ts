@@ -10,7 +10,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   splash: { backgroundColor: '#111111' },
   ios: { supportsTablet: true, bundleIdentifier: 'com.isker.app' },
   android: { adaptiveIcon: { backgroundColor: '#111111' }, package: 'com.isker.app' },
-  web: { bundler: 'metro' },
+  web: { bundler: 'metro', output: 'static', favicon: './assets/favicon.png' },
   plugins: ['expo-router'],
   scheme: 'isker',
 });

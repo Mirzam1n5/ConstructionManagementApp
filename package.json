@@ -7,7 +7,8 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "build:web": "npx expo export --platform web"
+    "build:web": "npx expo export --platform web",
+    "serve": "node server.js"
   },
   "dependencies": {
     "expo": "~54.0.0",
@@ -27,7 +28,8 @@
     "@react-navigation/bottom-tabs": "^7.2.0",
     "react-native-is-edge-to-edge": "^1.1.6",
     "react-dom": "18.3.1",
-    "react-native-web": "~0.19.13"
+    "react-native-web": "~0.19.13",
+    "express": "^4.18.0"
   },
   "devDependencies": {
     "@babel/core": "^7.24.0",
