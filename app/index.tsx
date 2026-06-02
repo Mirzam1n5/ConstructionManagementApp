@@ -108,7 +108,7 @@ function LineChart({series,w=300,h=110}:{series:{data:number[];color:string;labe
 function ColChart({data,colors,w=300,h=110,showVals=true}:{data:{label:string;value:number}[];colors?:string[];w?:number;h?:number;showVals?:boolean}){
   if(!data.length)return null;
   const max=Math.max(...data.map(d=>d.value),1);
-  const padT=32,padH=4;
+  const padT=showVals?28:10,padH=4;
   const cw=w-padH*2,ch=h-padT;
   const bw=Math.floor((cw/data.length)*0.82);
   const gap=cw/data.length;
@@ -120,17 +120,26 @@ function ColChart({data,colors,w=300,h=110,showVals=true}:{data:{label:string;va
         const bx=padH+gap*i+gap/2-bw/2;
         const by=padT+ch-bh;
         const col=colors?colors[i%colors.length]:D.accent;
-        const fs=Math.max(13,Math.min(20,bw*0.48));
+        const fs=Math.max(10,Math.min(16,bw*0.42));
         const tx=bx+bw/2;
-        const ty=padT+ch-4;
+        // Label centered vertically inside bar
+        const labelY=by+bh/2;
         return(
           <G key={i}>
-            <Rect x={bx} y={by} width={bw} height={bh} fill={col} opacity={0.92}/>
-            <ST x={tx} y={by-6} textAnchor="middle" fontSize={fs*0.9} fill={col} fontWeight="800">{d.value}</ST>
-            <ST x={0} y={0} fontSize={fs} fill={D.bg} fontWeight="800"
-              transform={`translate(${tx}, ${ty}) rotate(-90) translate(6, ${bw*0.35})`}>
-              {d.label}
-            </ST>
+            <Rect x={bx} y={by} width={bw} height={bh} fill={col} opacity={0.92} rx={2}/>
+            {showVals&&(
+              <ST x={tx} y={by-6} textAnchor="middle" fontSize={fs*0.9} fill={col} fontWeight="800">{d.value}</ST>
+            )}
+            {bh>20&&(
+              <ST
+                x={0} y={0}
+                fontSize={fs} fill={D.bg} fontWeight="800"
+                transform={`translate(${tx}, ${labelY}) rotate(-90)`}
+                textAnchor="middle"
+              >
+                {d.label}
+              </ST>
+            )}
           </G>
         );
       })}
@@ -911,7 +920,14 @@ export default function HomeScreen(){
 
   return(
     <ScrollView style={{flex:1,backgroundColor:D.bg}} contentContainerStyle={{padding:16,gap:12}}>
-      <Stack.Screen options={{ headerShown: false }} />
+      <Stack.Screen options={{
+        headerShown: true,
+        title: 'ISKER',
+        headerTitleAlign: 'center',
+        headerStyle: { backgroundColor: D.panel },
+        headerTitleStyle: { color: D.text, fontWeight: '800', fontSize: 18, letterSpacing: 3 },
+        headerShadowVisible: false,
+      }} />
       {data.projects.map(p=>(
         <TouchableOpacity key={p.project_id}
           style={{backgroundColor:D.card,padding:16,borderWidth:1,borderColor:D.border}}

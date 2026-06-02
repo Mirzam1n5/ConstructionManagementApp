@@ -210,9 +210,9 @@ function WorkersDetail({ projectId, data }: { projectId: string; data: any }) {
 
         <ChartCard
           title="Rate Distribution"
-          expandedContent={(w: number) => <ColumnChart data={rateBuckets} color={COLORS.darkGray} width={w} height={260} showValues />}
+          expandedContent={(w: number) => <ColumnChart data={rateBuckets} color={COLORS.accent} width={w} height={260} showValues />}
         >
-          {(w: number) => <ColumnChart data={rateBuckets} color={COLORS.darkGray} width={w} height={chartH} showValues />}
+          {(w: number) => <ColumnChart data={rateBuckets} color={COLORS.accent} width={w} height={chartH} showValues />}
         </ChartCard>
 
         <ChartCard title="Dept. Daily Cost ($)">
@@ -318,9 +318,9 @@ function EquipmentDetail({ projectId, data }: { projectId: string; data: any }) 
       <ChartCard
         title="Equipment by Type"
         style={{ marginBottom: 8 }}
-        expandedContent={(w: number) => <ColumnChart data={typeData} color={COLORS.darkGray} width={w} height={280} showValues />}
+        expandedContent={(w: number) => <ColumnChart data={typeData} color={COLORS.blue} width={w} height={280} showValues />}
       >
-        {(w: number) => <ColumnChart data={typeData} color={COLORS.darkGray} width={w} height={isTV ? 200 : 130} showValues />}
+        {(w: number) => <ColumnChart data={typeData} color={COLORS.blue} width={w} height={isTV ? 200 : 130} showValues />}
       </ChartCard>
 
       <ChartGrid>
@@ -369,7 +369,7 @@ function EquipmentDetail({ projectId, data }: { projectId: string; data: any }) 
         mobileRender={(row, i) => (
           <View style={[styles.aRow, i === equip.length - 1 && { borderBottomWidth: 0 }]}>
             <View style={[styles.avatar, { backgroundColor: COLORS.lightGray }]}>
-              <Ionicons name="construct-outline" size={13} color={COLORS.darkGray} />
+              <Ionicons name="construct-outline" size={13} color={COLORS.midGray} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.aName} numberOfLines={1}>{row.name as string}</Text>
@@ -463,7 +463,7 @@ function BudgetDetail({ projectId, data }: { projectId: string; data: any }) {
 
         {/* By category */}
         <ChartCard title="By Category ($K)">
-          {(w: number) => <ColumnChart data={catColData} color={COLORS.darkGray} width={w} height={chartH} />}
+          {(w: number) => <ColumnChart data={catColData} color={COLORS.yellow} width={w} height={chartH} />}
         </ChartCard>
       </ChartGrid>
 
@@ -631,7 +631,7 @@ function ScheduleDetail({ projectId, data }: { projectId: string; data: any }) {
 
         {/* Milestones per phase */}
         <ChartCard title="Milestones per Phase">
-          <ColumnChart data={phaseCountData} color={COLORS.darkGray} width={cardW} height={chartH} showValues />
+          <ColumnChart data={phaseCountData} color={COLORS.blue} width={cardW} height={chartH} showValues />
         </ChartCard>
 
         {/* Progress bars – hbar */}
@@ -731,7 +731,7 @@ function IssuesDetail({ projectId, data }: { projectId: string; data: any }) {
 
         {/* By category – hbar */}
         <ChartCard title="By Category">
-          <HBarChart data={catData} color={COLORS.darkGray} />
+          <HBarChart data={catData} color={COLORS.midGray} />
         </ChartCard>
 
         {/* Priority column */}
@@ -825,7 +825,7 @@ function ReportsDetail({ projectId, data }: { projectId: string; data: any }) {
 
         {/* Equipment trend – area */}
         <ChartCard title="Equipment Trend">
-          <AreaChart data={equipTrend.slice(0, 20)} color={COLORS.darkGray} width={cardW} height={chartH} />
+          <AreaChart data={equipTrend.slice(0, 20)} color={COLORS.blue} width={cardW} height={chartH} />
         </ChartCard>
 
         {/* Recent workers – column */}
@@ -835,7 +835,7 @@ function ReportsDetail({ projectId, data }: { projectId: string; data: any }) {
 
         {/* Weather distribution */}
         <ChartCard title="Weather Distribution">
-          <HBarChart data={weatherData} color={COLORS.darkGray} />
+          <HBarChart data={weatherData} color={COLORS.midGray} />
         </ChartCard>
       </ChartGrid>
 

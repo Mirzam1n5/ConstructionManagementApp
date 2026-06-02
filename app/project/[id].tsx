@@ -22,8 +22,8 @@ function MetricCard({ icon, label, value, sub, accent, onPress }: {
   return (
     <TouchableOpacity style={styles.metricCard} onPress={onPress} activeOpacity={0.75}>
       <View style={styles.metricTop}>
-        <View style={[styles.iconBox, { backgroundColor: accent ? accent + '18' : COLORS.lightGray }]}>
-          <Ionicons name={icon} size={18} color={accent ?? COLORS.darkGray} />
+        <View style={[styles.iconBox, { backgroundColor: accent ? accent + '22' : COLORS.muted + '33' }]}>
+          <Ionicons name={icon} size={18} color={accent ?? COLORS.white} />
         </View>
         <Ionicons name="chevron-forward" size={12} color="#ccc" />
       </View>
