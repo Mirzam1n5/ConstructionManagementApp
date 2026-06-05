@@ -1,8 +1,7 @@
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Platform, useWindowDimensions, ScrollView } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, Platform, useWindowDimensions, ScrollView, TouchableOpacity } from 'react-native';
 import { useRouter, Stack } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import Svg, { Path, Circle, Rect, Line, G, Text as ST, Defs, LinearGradient, Stop } from 'react-native-svg';
+import Svg, { Path, Circle, G, Text as ST, Line, Defs, LinearGradient, Stop, Rect } from 'react-native-svg';
 import { useSheetData, Project, SheetData } from '../hooks/useSheetData';
 
 const D = {
@@ -16,129 +15,168 @@ const D = {
   orange:'#ff9100',orangeDim:'#271500',
 };
 
-const fmt$M = (v:number) => v>=1e6?`$${(v/1e6).toFixed(1)}M`:v>=1e3?`$${(v/1e3).toFixed(0)}K`:`$${v}`;
-const fmtPct = (v:number) => `${Math.round(v)}%`;
-function sColor(s:string){ return ['On Track','Active','Resolved','Done','Completed'].includes(s)?D.green:['Delayed','Open','Critical'].includes(s)?D.red:['In Progress'].includes(s)?D.blue:D.muted; }
-function iColor(v:number){ return v>=1?D.green:D.red; }
+const fmt$M=(v:number)=>v>=1e6?`$${(v/1e6).toFixed(1)}M`:v>=1e3?`$${(v/1e3).toFixed(0)}K`:`$${v}`;
+const fmtP=(v:number)=>`${Math.round(v)}%`;
+function sCol(s:string){return['On Track','Active','Resolved','Done'].includes(s)?D.green:['Delayed','Open'].includes(s)?D.red:D.blue;}
+function iCol(v:number){return v>=1?D.green:D.red;}
 
-// ── Arc Gauge (sidebar only) ──────────────────────────────────────
-function ArcGauge({pct,color,size=110,label,sublabel}:{pct:number;color:string;size?:number;label?:string;sublabel?:string}){
-  const cx=size/2,cy=size*0.62,r=size*0.40,sw=size*0.10;
-  const p=Math.min(1,Math.max(0,pct/100));
-  const toRad=(d:number)=>d*Math.PI/180;
-  const startDeg=210,totalArc=240;
-  function arcPt(deg:number){return{x:cx+r*Math.cos(toRad(deg)),y:cy+r*Math.sin(toRad(deg))};}
-  function arcPath(from:number,to:number){const s=arcPt(from),e=arcPt(to),large=to-from>180?1:0;return`M${s.x},${s.y} A${r},${r} 0 ${large} 1 ${e.x},${e.y}`;}
-  const segs=[{from:210,to:258,c:'#e53935'},{from:258,to:306,c:'#fb8c00'},{from:306,to:354,c:'#fdd835'},{from:354,to:402,c:'#7cb342'},{from:402,to:450,c:'#00c853'}];
-  const endDeg=startDeg+totalArc*p;
-  const nrad=toRad(endDeg),nLen=r*0.78;
-  const tipX=cx+nLen*Math.cos(nrad),tipY=cy+nLen*Math.sin(nrad);
-  const bRad=toRad(endDeg+90),bw=sw*0.14;
-  const b1x=cx+bw*Math.cos(bRad),b1y=cy+bw*Math.sin(bRad),b2x=cx-bw*Math.cos(bRad),b2y=cy-bw*Math.sin(bRad);
-  const ticks=[0,25,50,75,100];
+// ── Live clock ──────────────────────────────────────────────────
+function Clock(){
+  const [t,setT]=useState(new Date());
+  useEffect(()=>{const id=setInterval(()=>setT(new Date()),1000);return()=>clearInterval(id);},[]);
+  return<Text style={{color:D.muted,fontSize:12,fontWeight:'600',letterSpacing:1}}>{t.toLocaleTimeString()}</Text>;
+}
+
+// ── Section label ───────────────────────────────────────────────
+function SL({label,color=D.sub}:{label:string;color?:string}){
   return(
-    <View style={{alignItems:'center'}}>
-      <Svg width={size} height={size*0.75}>
-        <Path d={arcPath(startDeg,startDeg+totalArc)} fill="none" stroke={D.border} strokeWidth={sw} strokeLinecap="butt"/>
-        {segs.map((seg,i)=><Path key={i} d={arcPath(seg.from,seg.to)} fill="none" stroke={seg.c} strokeWidth={sw} opacity={0.2} strokeLinecap="butt"/>)}
-        {p>0.001&&<Path d={arcPath(startDeg,endDeg)} fill="none" stroke={color} strokeWidth={sw} strokeLinecap="butt"/>}
-        {ticks.map(t=>{const deg=startDeg+(t/100)*totalArc,pos=arcPt(deg),offset=sw*1.4,rad=toRad(deg),lx=cx+(r+offset)*Math.cos(rad),ly=cy+(r+offset)*Math.sin(rad);return<ST key={t} x={lx} y={ly+3} textAnchor="middle" fontSize={size*0.08} fill={D.muted}>{t}</ST>;})}
-        <Path d={`M${b1x},${b1y} L${tipX},${tipY} L${b2x},${b2y} Z`} fill={D.text}/>
-        <Circle cx={cx} cy={cy} r={sw*0.32} fill={D.text}/>
-      </Svg>
-      {label!=null&&<Text style={{fontSize:size*0.17,fontWeight:'800',color,marginTop:-size*0.05}}>{label}</Text>}
-      {sublabel!=null&&<Text style={{fontSize:size*0.09,color:D.muted,marginTop:1,textAlign:'center'}}>{sublabel}</Text>}
+    <View style={{flexDirection:'row',alignItems:'center',gap:5,marginBottom:6}}>
+      <View style={{width:3,height:14,backgroundColor:color}}/>
+      <Text style={{fontSize:10,fontWeight:'800',color,letterSpacing:1.5}}>{label}</Text>
     </View>
   );
 }
 
-// ── Line Chart ────────────────────────────────────────────────────
-function LineChart({series,w=300,h=110}:{series:{data:number[];color:string;label:string}[];w?:number;h?:number}){
-  const allVals=series.flatMap(s=>s.data);
-  if(allVals.length<2)return null;
-  const min=Math.min(...allVals),max=Math.max(...allVals),range=max-min||1;
-  const padL=36,padR=12,padT=10,padB=22;
-  const cw=w-padL-padR,ch=h-padT-padB;
-  const maxLen=Math.max(...series.map(s=>s.data.length));
-  function toPath(data:number[],filled:boolean){
-    const pts=data.map((v,i)=>({x:padL+(i/(maxLen-1))*cw,y:padT+(1-(v-min)/range)*ch}));
-    const line=pts.map((p,i)=>`${i===0?'M':'L'}${p.x},${p.y}`).join(' ');
-    if(filled){const area=`${line} L${pts[pts.length-1].x},${padT+ch} L${pts[0].x},${padT+ch} Z`;return{line,area,pts};}
-    return{line,area:'',pts};
-  }
-  // Y axis labels
-  const yTicks=[min,min+range*0.5,max];
+// ── Big Arc Gauge ────────────────────────────────────────────────
+function ArcGauge({pct,color,size=140,label,sublabel,plan}:{pct:number;color:string;size?:number;label?:string;sublabel?:string;plan?:number}){
+  const cx=size/2,cy=size*0.62,r=size*0.38,sw=size*0.11;
+  const p=Math.min(1,Math.max(0,pct/100));
+  const toRad=(d:number)=>d*Math.PI/180;
+  const S=210,ARC=240;
+  function apt(deg:number){return{x:cx+r*Math.cos(toRad(deg)),y:cy+r*Math.sin(toRad(deg))};}
+  function ap(f:number,t:number){const s=apt(f),e=apt(t),lg=t-f>180?1:0;return`M${s.x},${s.y} A${r},${r} 0 ${lg} 1 ${e.x},${e.y}`;}
+  const SEGS=[{f:210,t:258,c:'#e53935'},{f:258,t:306,c:'#fb8c00'},{f:306,t:354,c:'#fdd835'},{f:354,t:402,c:'#7cb342'},{f:402,t:450,c:'#00c853'}];
+  const endD=S+ARC*p;
+  const nr=toRad(endD),nL=r*0.8;
+  const tx=cx+nL*Math.cos(nr),ty=cy+nL*Math.sin(nr);
+  const br=toRad(endD+90),bw=sw*0.13;
+  const b1x=cx+bw*Math.cos(br),b1y=cy+bw*Math.sin(br),b2x=cx-bw*Math.cos(br),b2y=cy-bw*Math.sin(br);
+  const ticks=[0,25,50,75,100];
+  // Plan needle
+  const planD=plan!=null?S+ARC*(Math.min(100,Math.max(0,plan))/100):null;
   return(
-    <Svg width={w} height={h}>
-      <Defs>
-        {series.map((s,i)=>(
-          <LinearGradient key={i} id={`g${i}`} x1="0" y1="0" x2="0" y2="1">
-            <Stop offset="0" stopColor={s.color} stopOpacity={0.25}/>
-            <Stop offset="1" stopColor={s.color} stopOpacity={0.0}/>
-          </LinearGradient>
-        ))}
-      </Defs>
-      {/* Grid */}
-      {[0,0.5,1].map((t,i)=>{
-        const y=padT+t*ch;
-        return<Line key={i} x1={padL} y1={y} x2={w-padR} y2={y} stroke={D.border} strokeWidth={1} strokeDasharray={i===0||i===2?'0':'4 4'}/>;
+    <View style={{alignItems:'center'}}>
+      <Svg width={size} height={size*0.74}>
+        <Path d={ap(S,S+ARC)} fill="none" stroke={D.border} strokeWidth={sw} strokeLinecap="butt"/>
+        {SEGS.map((sg,i)=><Path key={i} d={ap(sg.f,sg.t)} fill="none" stroke={sg.c} strokeWidth={sw} opacity={0.22} strokeLinecap="butt"/>)}
+        {p>0.001&&<Path d={ap(S,endD)} fill="none" stroke={color} strokeWidth={sw} strokeLinecap="butt"/>}
+        {ticks.map(t=>{const deg=S+(t/100)*ARC,rad=toRad(deg),lx=cx+(r+sw*1.35)*Math.cos(rad),ly=cy+(r+sw*1.35)*Math.sin(rad);return<ST key={t} x={lx} y={ly+3} textAnchor="middle" fontSize={size*0.075} fill={D.muted}>{t}</ST>;})}
+        {/* Plan needle */}
+        {planD!=null&&(()=>{const prad=toRad(planD),plen=r*0.65,ptx=cx+plen*Math.cos(prad),pty=cy+plen*Math.sin(prad);return<Path d={`M${cx},${cy} L${ptx},${pty}`} stroke={D.yellow} strokeWidth={2} strokeDasharray="3,2"/>;})()}
+        <Path d={`M${b1x},${b1y} L${tx},${ty} L${b2x},${b2y} Z`} fill={D.text}/>
+        <Circle cx={cx} cy={cy} r={sw*0.3} fill={D.text}/>
+        <ST x={cx} y={cy+r*0.26} textAnchor="middle" fontSize={size*0.16} fontWeight="800" fill={color}>{label??fmtP(pct)}</ST>
+        {sublabel&&<ST x={cx} y={cy+r*0.48} textAnchor="middle" fontSize={size*0.09} fill={D.muted}>{sublabel}</ST>}
+      </Svg>
+    </View>
+  );
+}
+
+// ── Mini Donut ────────────────────────────────────────────────────
+function Donut({slices,size=70,label}:{slices:{value:number;color:string}[];size?:number;label?:string}){
+  const total=slices.reduce((s,d)=>s+d.value,0)||1;
+  const cx=size/2,cy=size/2,r=size*0.33,sw=size*0.18;
+  let angle=-Math.PI/2;
+  return(
+    <Svg width={size} height={size}>
+      {slices.map((sl,i)=>{
+        const sweep=(sl.value/total)*2*Math.PI;
+        const x1=cx+r*Math.cos(angle),y1=cy+r*Math.sin(angle);
+        angle+=sweep;
+        const x2=cx+r*Math.cos(angle),y2=cy+r*Math.sin(angle);
+        const lg=sweep>Math.PI?1:0;
+        if(sl.value===0)return null;
+        if(Math.abs(sl.value-total)<0.001)return<Circle key={i} cx={cx} cy={cy} r={r} fill="none" stroke={sl.color} strokeWidth={sw}/>;
+        return<Path key={i} d={`M${x1},${y1} A${r},${r} 0 ${lg} 1 ${x2},${y2}`} fill="none" stroke={sl.color} strokeWidth={sw} strokeLinecap="butt"/>;
       })}
-      {/* Y labels */}
-      {yTicks.map((v,i)=>{
-        const y=padT+(1-(v-min)/range)*ch;
-        return<ST key={i} x={padL-4} y={y+4} textAnchor="end" fontSize={9} fill={D.muted}>{v>=1e6?(v/1e6).toFixed(1)+'M':v>=1e3?(v/1e3).toFixed(0)+'K':v.toFixed(1)}</ST>;
-      })}
-      {/* Series */}
-      {series.map((s,i)=>{
-        if(s.data.length<2)return null;
-        const {line,area,pts}=toPath(s.data,true);
-        return(
-          <G key={i}>
-            {area&&<Path d={area} fill={`url(#g${i})`}/>}
-            <Path d={line} fill="none" stroke={s.color} strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round"/>
-            <Circle cx={pts[pts.length-1].x} cy={pts[pts.length-1].y} r={4} fill={s.color}/>
-          </G>
-        );
-      })}
+      {label&&<ST x={cx} y={cy+4} textAnchor="middle" fontSize={size*0.2} fontWeight="700" fill={D.text}>{label}</ST>}
     </Svg>
   );
 }
 
-// ── Column Chart ──────────────────────────────────────────────────
-function ColChart({data,colors,w=300,h=110,showVals=true}:{data:{label:string;value:number}[];colors?:string[];w?:number;h?:number;showVals?:boolean}){
+// ── Sparkline ────────────────────────────────────────────────────
+function Spark({data,color,w,h=36,filled=true}:{data:number[];color:string;w:number;h?:number;filled?:boolean}){
+  if(data.length<2)return null;
+  const mn=Math.min(...data),mx=Math.max(...data),rng=mx-mn||1;
+  const pd=4,cw=w-pd*2,ch=h-pd*2;
+  const pts=data.map((v,i)=>({x:pd+(i/(data.length-1))*cw,y:pd+(1-(v-mn)/rng)*ch}));
+  const d=pts.map((p,i)=>`${i===0?'M':'L'}${p.x},${p.y}`).join(' ');
+  const area=`${d} L${pts[pts.length-1].x},${pd+ch} L${pts[0].x},${pd+ch} Z`;
+  return(
+    <Svg width={w} height={h}>
+      {filled&&<Path d={area} fill={color} opacity={0.12}/>}
+      <Path d={d} fill="none" stroke={color} strokeWidth={2} strokeLinejoin="round"/>
+      <Circle cx={pts[pts.length-1].x} cy={pts[pts.length-1].y} r={3} fill={color}/>
+    </Svg>
+  );
+}
+
+// ── S-Curve ──────────────────────────────────────────────────────
+function SCurve({planned,actual,labels,w,h=90}:{planned:number[];actual:number[];labels:string[];w:number;h?:number}){
+  const all=[...planned,...actual];
+  const mn=Math.min(...all),mx=Math.max(...all),rng=mx-mn||1;
+  const padL=28,padR=6,padT=8,padB=20;
+  const cw=w-padL-padR,ch=h-padT-padB;
+  const n=labels.length;
+  function toP(v:number,i:number){return{x:padL+(i/(n-1))*cw,y:padT+(1-(v-mn)/rng)*ch};}
+  function pth(vals:number[]){return vals.map((v,i)=>`${i===0?'M':'L'}${toP(v,i).x},${toP(v,i).y}`).join(' ');}
+  function area(vals:number[]){const pts=vals.map((v,i)=>toP(v,i));const l=pts[pts.length-1],f=pts[0];return`${pth(vals)} L${l.x},${padT+ch} L${f.x},${padT+ch} Z`;}
+  const yTicks=[0,50,100];
+  return(
+    <Svg width={w} height={h}>
+      {yTicks.map(t=>{const y=padT+(1-t/100)*ch;return<G key={t}><Line x1={padL} y1={y} x2={w-padR} y2={y} stroke={D.border} strokeWidth={0.5}/><ST x={padL-3} y={y+4} textAnchor="end" fontSize={8} fill={D.muted}>{t}</ST></G>;})}
+      <Path d={area(planned)} fill={D.yellow} opacity={0.07}/>
+      <Path d={pth(planned)} fill="none" stroke={D.yellow} strokeWidth={1.5} strokeDasharray="4,3"/>
+      <Path d={area(actual)} fill={D.blue} opacity={0.12}/>
+      <Path d={pth(actual)} fill="none" stroke={D.blue} strokeWidth={2}/>
+      {actual.map((v,i)=>{const p=toP(v,i);return<Circle key={i} cx={p.x} cy={p.y} r={2.5} fill={D.blue}/>;} )}
+      {labels.map((l,i)=>{const p=toP(0,i);return<ST key={i} x={p.x} y={h-4} textAnchor="middle" fontSize={8} fill={D.muted}>{l}</ST>;})}
+    </Svg>
+  );
+}
+
+// ── Column Chart (vertical labels) ──────────────────────────────
+function ColChart({data,colors,w,h=100,showVals=true,labelSize=11}:{
+  data:{label:string;value:number}[];colors?:string[];
+  w:number;h?:number;showVals?:boolean;labelSize?:number;
+}){
   if(!data.length)return null;
   const max=Math.max(...data.map(d=>d.value),1);
-  const padT=showVals?28:10,padH=4;
-  const cw=w-padH*2,ch=h-padT;
-  const bw=Math.floor((cw/data.length)*0.82);
+  const padL=6,padR=6,padT=showVals?26:8,padB=6;
+  const cw=w-padL-padR,ch=h-padT-padB;
+  const bw=Math.max(14,Math.floor((cw/data.length)*0.78));
   const gap=cw/data.length;
   return(
     <Svg width={w} height={h}>
-      <Line x1={padH} y1={padT+ch} x2={w-padH} y2={padT+ch} stroke={D.border} strokeWidth={1}/>
+      <Line x1={padL} y1={padT+ch} x2={w-padR} y2={padT+ch} stroke={D.border} strokeWidth={1}/>
       {data.map((d,i)=>{
-        const bh=Math.max(10,(d.value/max)*ch);
-        const bx=padH+gap*i+gap/2-bw/2;
-        const by=padT+ch-bh;
-        const col=colors?colors[i%colors.length]:D.accent;
-        const fs=Math.max(10,Math.min(16,bw*0.42));
-        const tx=bx+bw/2;
-        // Label centered vertically inside bar
-        const labelY=by+bh/2;
+        const bh=Math.max(20,(d.value/max)*ch);
+        const cx=padL+gap*i+gap/2;
+        const x=cx-bw/2;
+        const y=padT+ch-bh;
+        const c=colors?colors[i%colors.length]:D.blue;
+        // Value above bar
+        const valY=y-5;
+        // Label centered inside bar vertically
+        const labelMidY=y+bh/2;
+        const fs=Math.max(labelSize,bw*0.36);
         return(
           <G key={i}>
-            <Rect x={bx} y={by} width={bw} height={bh} fill={col} opacity={0.92} rx={2}/>
+            <Rect x={x} y={y} width={bw} height={bh} fill={c} opacity={0.88} rx={2}/>
+            {/* Value above */}
             {showVals&&(
-              <ST x={tx} y={by-6} textAnchor="middle" fontSize={fs*0.9} fill={col} fontWeight="800">{d.value}</ST>
+              <ST x={cx} y={valY} textAnchor="middle" fontSize={Math.max(11,bw*0.42)} fill={c} fontWeight="900">{d.value}</ST>
             )}
-            {bh>20&&(
+            {/* Label inside bar, rotated -90, vertically centered */}
+            {bh>18&&(
               <ST
                 x={0} y={0}
-                fontSize={fs} fill={D.bg} fontWeight="800"
-                transform={`translate(${tx}, ${labelY}) rotate(-90)`}
+                fontSize={fs}
+                fill={D.bg}
+                fontWeight="700"
+                transform={`translate(${cx},${labelMidY}) rotate(-90)`}
                 textAnchor="middle"
-              >
-                {d.label}
-              </ST>
+              >{d.label}</ST>
             )}
           </G>
         );
@@ -146,23 +184,49 @@ function ColChart({data,colors,w=300,h=110,showVals=true}:{data:{label:string;va
     </Svg>
   );
 }
-// ── Horizontal Bars ───────────────────────────────────────────────
-function HBars({data,w=280,h=120}:{data:{label:string;value:number;color:string;max?:number}[];w?:number;h?:number}){
-  const globalMax=Math.max(...data.map(d=>d.max??d.value),1);
-  const rowH=h/data.length;
-  const padL=72,padR=36;
+
+// ── HBars ────────────────────────────────────────────────────────
+function HBars({data,color,w,compact=false}:{data:{label:string;value:number}[];color:string;w:number;compact?:boolean}){
+  const max=Math.max(...data.map(d=>d.value),1);
+  const fs=compact?12:13;
+  return(
+    <View style={{gap:compact?4:6}}>
+      {data.map((d,i)=>(
+        <View key={i} style={{gap:2}}>
+          <View style={{flexDirection:'row',justifyContent:'space-between'}}>
+            <Text style={{fontSize:fs,color:D.text}} numberOfLines={1}>{d.label}</Text>
+            <Text style={{fontSize:fs,color:color,fontWeight:'800'}}>{d.value}</Text>
+          </View>
+          <View style={{height:compact?5:6,backgroundColor:D.border,width:w}}>
+            <View style={{height:compact?5:6,width:Math.max(4,(d.value/max)*w) as any,backgroundColor:color}}/>
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+// ── Gantt strip ─────────────────────────────────────────────────
+function GanttStrip({milestones,w,h=70}:{milestones:any[];w:number;h?:number}){
+  if(!milestones.length)return null;
+  const phases=[...new Set(milestones.map((m:any)=>m.phase))] as string[];
+  const rowH=Math.floor(h/phases.length);
+  const colW=Math.floor(w/milestones.length);
+  const statColor=(s:string)=>s==='Done'?D.green:s==='In Progress'?D.blue:s==='Delayed'?D.red:D.muted;
   return(
     <Svg width={w} height={h}>
-      {data.map((d,i)=>{
-        const bw=((d.value/(d.max??globalMax))*(w-padL-padR));
-        const y=i*rowH+rowH*0.18;
-        const bh=rowH*0.6;
+      {phases.map((phase,pi)=>{
+        const ms=milestones.filter((m:any)=>m.phase===phase);
+        const done=ms.filter((m:any)=>m.status==='Done').length;
+        const pct=ms.length>0?done/ms.length:0;
+        const y=pi*rowH+2;
+        const barW=Math.max(4,pct*(w-60));
         return(
-          <G key={i}>
-            <ST x={padL-6} y={y+bh*0.75} textAnchor="end" fontSize={11} fill={D.sub}>{d.label}</ST>
-            <Rect x={padL} y={y} width={w-padL-padR} height={bh} fill={D.border} rx={0}/>
-            <Rect x={padL} y={y} width={Math.max(4,bw)} height={bh} fill={d.color} rx={0} opacity={0.9}/>
-            <ST x={padL+bw+5} y={y+bh*0.75} textAnchor="start" fontSize={11} fill={d.color} fontWeight="bold">{d.value}</ST>
+          <G key={pi}>
+            <ST x={2} y={y+rowH*0.65} fontSize={9} fill={D.sub}>{phase.slice(0,8)}</ST>
+            <Rect x={58} y={y+3} width={w-62} height={rowH-6} fill={D.border} opacity={0.4} rx={2}/>
+            <Rect x={58} y={y+3} width={barW} height={rowH-6} fill={pct===1?D.green:D.blue} opacity={0.85} rx={2}/>
+            <ST x={w-2} y={y+rowH*0.65} textAnchor="end" fontSize={9} fill={pct===1?D.green:D.blue} fontWeight="700">{Math.round(pct*100)}%</ST>
           </G>
         );
       })}
@@ -170,813 +234,333 @@ function HBars({data,w=280,h=120}:{data:{label:string;value:number;color:string;
   );
 }
 
-// ── Big Stat ──────────────────────────────────────────────────────
-function BStat({value,label,sub,color=D.text,bordered=false}:{value:string;label:string;sub?:string;color?:string;bordered?:boolean}){
+// ── Metric box ──────────────────────────────────────────────────
+function MBox({label,value,color=D.text,sub}:{label:string;value:string;color?:string;sub?:string}){
   return(
-    <View style={[ss.bstat,bordered&&{borderWidth:2,borderColor:color+'66'}]}>
-      <Text style={[ss.bval,{color}]}>{value}</Text>
-      <Text style={ss.blab}>{label}</Text>
-      {sub&&<Text style={[ss.bsub,{color:sub.includes('✓')?D.green:sub.includes('⚠')?D.red:D.muted}]}>{sub}</Text>}
+    <View style={{flex:1,backgroundColor:D.card,borderWidth:1,borderColor:D.border,padding:8,alignItems:'center',justifyContent:'center',minHeight:52}}>
+      <Text style={{fontSize:10,color:D.muted,letterSpacing:1,textTransform:'uppercase',marginBottom:2}}>{label}</Text>
+      <Text style={{fontSize:20,fontWeight:'900',color,lineHeight:22}}>{value}</Text>
+      {sub&&<Text style={{fontSize:9,color:D.muted,marginTop:1}}>{sub}</Text>}
     </View>
   );
 }
 
-function SL({t}:{t:string}){return<Text style={ss.sl}>{t}</Text>;}
-
-// ─────────────────────────────────────────────────────────────────
-// TABS
-// ─────────────────────────────────────────────────────────────────
-
-// ── Donut chart ────────────────────────────────────────────────────
-function DonutChart({slices,size=110,label,sublabel}:{slices:{value:number;color:string;label:string}[];size?:number;label?:string;sublabel?:string}){
-  const total=slices.reduce((s,d)=>s+d.value,0)||1;
-  const cx=size/2,cy=size/2,r=size*0.34,sw=size*0.17;
-  let angle=-Math.PI/2;
-  const paths=slices.map(sl=>{
-    const sweep=(sl.value/total)*2*Math.PI;
-    const x1=cx+r*Math.cos(angle),y1=cy+r*Math.sin(angle);
-    angle+=sweep;
-    const x2=cx+r*Math.cos(angle),y2=cy+r*Math.sin(angle);
-    const large=sweep>Math.PI?1:0;
-    return{path:`M${x1},${y1} A${r},${r} 0 ${large} 1 ${x2},${y2}`,color:sl.color,label:sl.label,value:sl.value};
-  });
+// ── Camera feed ─────────────────────────────────────────────────
+function CamFeed({name,w,h}:{name:string;w:number;h:number}){
+  const [t,setT]=useState(new Date());
+  useEffect(()=>{const id=setInterval(()=>setT(new Date()),1000);return()=>clearInterval(id);},[]);
   return(
-    <View style={{alignItems:'center',gap:6}}>
-      <Svg width={size} height={size}>
-        <Circle cx={cx} cy={cy} r={r} fill="none" stroke={D.border} strokeWidth={sw}/>
-        {paths.map((p,i)=>(
-          p.value>0&&<Path key={i} d={p.path} fill="none" stroke={p.color} strokeWidth={sw} strokeLinecap="butt"/>
-        ))}
-        {label&&<ST x={cx} y={cy-4} textAnchor="middle" fontSize={size*0.19} fill={D.text} fontWeight="bold">{label}</ST>}
-        {sublabel&&<ST x={cx} y={cy+size*0.14} textAnchor="middle" fontSize={size*0.12} fill={D.muted}>{sublabel}</ST>}
-      </Svg>
-      <View style={{flexDirection:'row',flexWrap:'wrap',gap:8,justifyContent:'center'}}>
-        {slices.map((sl,i)=>(
-          <View key={i} style={{flexDirection:'row',alignItems:'center',gap:4}}>
-            <View style={{width:9,height:9,backgroundColor:sl.color}}/>
-            <Text style={{color:D.sub,fontSize:11}}>{sl.label} <Text style={{color:sl.color,fontWeight:'700'}}>{sl.value}</Text></Text>
-          </View>
-        ))}
+    <View style={{width:w,height:h,backgroundColor:'#000',borderWidth:1,borderColor:D.border,overflow:'hidden',position:'relative'}}>
+      <View style={{position:'absolute',top:0,left:0,right:0,flexDirection:'row',alignItems:'center',justifyContent:'space-between',paddingHorizontal:10,paddingVertical:6,backgroundColor:'rgba(0,0,0,0.75)',zIndex:2}}>
+        <View style={{flexDirection:'row',alignItems:'center',gap:5}}>
+          <View style={{width:7,height:7,borderRadius:3.5,backgroundColor:D.red}}/>
+          <Text style={{color:D.text,fontSize:11,fontWeight:'700',letterSpacing:1}}>● LIVE</Text>
+        </View>
+        <Text style={{color:D.sub,fontSize:10,letterSpacing:1}}>{name.toUpperCase()}</Text>
+        <Text style={{color:D.muted,fontSize:10}}>{t.toLocaleTimeString()}</Text>
       </View>
-    </View>
-  );
-}
-
-// ── Radial bars (like a circular progress stack) ───────────────────
-function RadialBars({items,size=120}:{items:{label:string;pct:number;color:string}[];size?:number}){
-  const cx=size/2,cy=size/2;
-  const rings=items.slice(0,4);
-  const gap=size*0.072,rOuter=size*0.42;
-  return(
-    <View style={{alignItems:'center',gap:8}}>
-      <Svg width={size} height={size}>
-        {rings.map((item,i)=>{
-          const r=rOuter-i*gap*2.2,sw=gap*1.1;
-          const p=Math.min(0.999,Math.max(0.001,item.pct/100));
-          const angle=p*2*Math.PI-Math.PI/2;
-          const x1=cx,y1=cy-r;
-          const x2=cx+r*Math.cos(angle),y2=cy+r*Math.sin(angle);
-          const large=p>0.5?1:0;
-          return(
-            <G key={i}>
-              <Circle cx={cx} cy={cy} r={r} fill="none" stroke={D.border} strokeWidth={sw}/>
-              <Path d={`M${x1},${y1} A${r},${r} 0 ${large} 1 ${x2},${y2}`} fill="none" stroke={item.color} strokeWidth={sw} strokeLinecap="round"/>
-            </G>
-          );
-        })}
-      </Svg>
-      <View style={{gap:4}}>
-        {rings.map((item,i)=>(
-          <View key={i} style={{flexDirection:'row',alignItems:'center',gap:6}}>
-            <View style={{width:10,height:10,backgroundColor:item.color}}/>
-            <Text style={{color:D.sub,fontSize:12,width:90}} numberOfLines={1}>{item.label}</Text>
-            <Text style={{color:item.color,fontSize:13,fontWeight:'800'}}>{Math.round(item.pct)}%</Text>
-          </View>
-        ))}
+      <View style={{flex:1,alignItems:'center',justifyContent:'center',gap:8}}>
+        <View style={{width:h*0.22,height:h*0.16,borderWidth:1.5,borderColor:D.muted,alignItems:'center',justifyContent:'center'}}>
+          <View style={{width:h*0.08,height:h*0.08,borderRadius:h*0.04,borderWidth:1.5,borderColor:D.muted}}/>
+        </View>
+        <Text style={{color:D.muted,fontSize:10,letterSpacing:3}}>CAM 01</Text>
+        <Text style={{color:D.border,fontSize:9}}>SITE CAMERA FEED</Text>
       </View>
+      {Array.from({length:Math.floor(h/4)}).map((_,i)=>(
+        <View key={i} style={{position:'absolute',left:0,right:0,top:i*4,height:1,backgroundColor:'#fff',opacity:0.015}}/>
+      ))}
+      {([{top:8,left:8},{top:8,right:8},{bottom:8,left:8},{bottom:8,right:8}] as any[]).map((pos,i)=>(
+        <View key={i} style={{position:'absolute',...pos,width:h*0.07,height:h*0.07,
+          borderTopWidth:pos.top!==undefined?1.5:0,borderBottomWidth:pos.bottom!==undefined?1.5:0,
+          borderLeftWidth:pos.left!==undefined?1.5:0,borderRightWidth:pos.right!==undefined?1.5:0,
+          borderColor:D.accent}}/>
+      ))}
     </View>
   );
 }
 
-function TabOverview({p,data}:{p:Project;data:SheetData}){
+// ── LEFT column dashboard ───────────────────────────────────────
+function LeftDash({p,data,w,h,fs=14}:{p:Project;data:SheetData;w:number;h:number;fs?:number}){
+  const prog=Number(p.progress_pct),cpi=Number(p.cpi),spi=Number(p.spi);
   const spent=Number(p.spent_to_date_usd),total=Number(p.total_budget_usd);
   const bPct=total>0?(spent/total)*100:0;
-  const prog=Number(p.progress_pct),cpi=Number(p.cpi),spi=Number(p.spi);
-  const bColor=bPct>90?D.red:bPct>75?D.orange:D.green;
 
-  // EVM
+  const workers=data.workers.filter(wr=>wr.project_id===p.project_id);
+  const active=workers.filter(wr=>wr.status==='Active').length;
+  const byDept:Record<string,number>={};
+  workers.forEach(wr=>{byDept[wr.department]=(byDept[wr.department]??0)+1;});
+  const depts=Object.entries(byDept).sort((a,b)=>b[1]-a[1]).slice(0,4);
+
   const evm=data.evm.filter(e=>e.project_id===p.project_id);
+  const cpiTrend=evm.map(e=>Number(e.cpi)).filter(Boolean);
+  const spiTrend=evm.map(e=>Number(e.spi)).filter(Boolean);
 
-  // Issues
   const issues=data.issues.filter(i=>i.project_id===p.project_id);
   const openH=issues.filter(i=>i.status==='Open'&&i.priority==='High').length;
   const openM=issues.filter(i=>i.status==='Open'&&i.priority==='Medium').length;
-  const openL=issues.filter(i=>i.status==='Open'&&i.priority==='Low').length;
-  const closedI=issues.filter(i=>i.status==='Resolved').length;
 
-  // Workers
-  const workers=data.workers.filter(w=>w.project_id===p.project_id);
-  const wActive=workers.filter(w=>w.status==='Active').length;
-  const byDept:Record<string,number>={};
-  workers.forEach(w=>{byDept[w.department]=(byDept[w.department]??0)+1;});
-  const topDepts=Object.entries(byDept).sort((a,b)=>b[1]-a[1]).slice(0,4);
+  const gap=6;
+  const innerW=w-20;
+  const gaugeSize=Math.min(innerW*0.88, h*0.34);
 
-  // Equipment
+  return(
+    <View style={{width:w,height:h,padding:10,gap:gap,overflow:'hidden'}}>
+      {/* Project name */}
+      <View style={{flexDirection:'row',alignItems:'center',gap:6}}>
+        <View style={{width:8,height:8,borderRadius:4,backgroundColor:sCol(p.status)}}/>
+        <Text style={{fontSize:10,color:sCol(p.status),fontWeight:'700',letterSpacing:1.5}}>{p.status.toUpperCase()}</Text>
+        <Text style={{flex:1,fontSize:fs*1.1,fontWeight:'800',color:D.text}} numberOfLines={1}>{p.project_name}</Text>
+      </View>
+
+      {/* Big gauge + key metrics */}
+      <View style={{flexDirection:'row',alignItems:'flex-start',gap:gap}}>
+        <View style={{alignItems:'center'}}>
+          <ArcGauge pct={prog} color={D.blue} size={gaugeSize} label={fmtP(prog)} sublabel="vs plan" plan={Math.max(prog-5,0)}/>
+          <Text style={{fontSize:9,color:D.muted,marginTop:-4}}>OVERALL PROGRESS</Text>
+        </View>
+        <View style={{flex:1,gap:5}}>
+          <View style={{flexDirection:'row',gap:5}}>
+            <View style={{flex:1,backgroundColor:cpi>=1?D.greenDim:D.redDim,padding:7,alignItems:'center'}}>
+              <Text style={{fontSize:fs*0.85,fontWeight:'800',color:iCol(cpi)}}>CPI</Text>
+              <Text style={{fontSize:fs*1.8,fontWeight:'900',color:iCol(cpi)}}>{cpi}</Text>
+            </View>
+            <View style={{flex:1,backgroundColor:spi>=1?D.greenDim:D.redDim,padding:7,alignItems:'center'}}>
+              <Text style={{fontSize:fs*0.85,fontWeight:'800',color:iCol(spi)}}>SPI</Text>
+              <Text style={{fontSize:fs*1.8,fontWeight:'900',color:iCol(spi)}}>{spi}</Text>
+            </View>
+          </View>
+          {/* CPI/SPI trend */}
+          {cpiTrend.length>1&&(
+            <View style={{backgroundColor:D.card,borderWidth:1,borderColor:D.border,padding:5,gap:3}}>
+              <Text style={{fontSize:8,color:D.sub,letterSpacing:0.8}}>3-MONTH TREND</Text>
+              <View style={{flexDirection:'row',gap:4,alignItems:'center'}}>
+                <Spark data={cpiTrend.slice(-4)} color={iCol(cpi)} w={(innerW-gaugeSize-gap-10)*0.5} h={28}/>
+                <Spark data={spiTrend.slice(-4)} color={iCol(spi)} w={(innerW-gaugeSize-gap-10)*0.5} h={28}/>
+              </View>
+              <View style={{flexDirection:'row',justifyContent:'space-around'}}>
+                <Text style={{fontSize:8,color:iCol(cpi)}}>CPI</Text>
+                <Text style={{fontSize:8,color:iCol(spi)}}>SPI</Text>
+              </View>
+            </View>
+          )}
+        </View>
+      </View>
+
+      {/* Issues */}
+      <View style={{flexDirection:'row',gap:gap}}>
+        <MBox label="Open High" value={String(openH)} color={openH>0?D.red:D.green}/>
+        <MBox label="Open Med." value={String(openM)} color={openM>0?D.orange:D.green}/>
+        <MBox label="Workers" value={String(active)} color={D.green} sub={`of ${workers.length}`}/>
+        <MBox label="Budget" value={fmtP(bPct)} color={bPct>90?D.red:bPct>75?D.orange:D.blue}/>
+      </View>
+
+      {/* Workforce by dept */}
+      {depts.length>0&&(
+        <View style={{backgroundColor:D.card,borderWidth:1,borderColor:D.border,padding:8,gap:5,flex:1}}>
+          <SL label="WORKFORCE BY DEPT" color={D.green}/>
+          <HBars data={depts.map(([l,v])=>({label:l,value:v}))} color={D.green} w={innerW-16} compact/>
+        </View>
+      )}
+    </View>
+  );
+}
+
+// ── RIGHT column dashboard ──────────────────────────────────────
+function RightDash({p,data,w,h,fs=14}:{p:Project;data:SheetData;w:number;h:number;fs?:number}){
+  const spent=Number(p.spent_to_date_usd),total=Number(p.total_budget_usd);
+  const bPct=total>0?(spent/total)*100:0;
+
   const eq=data.equipment.filter(e=>e.project_id===p.project_id);
   const eqActive=eq.filter(e=>e.status==='Active').length;
   const eqMaint=eq.filter(e=>e.status==='Maintenance').length;
-
-  // Schedule
-  const ms=data.schedule.filter(m=>m.project_id===p.project_id);
-  const msDone=ms.filter(m=>['Done','Completed'].includes(m.status)).length;
-  const msDelayed=ms.filter(m=>m.status==='Delayed').length;
-  const msInProg=ms.filter(m=>m.status==='In Progress').length;
-
-  // Radial rings data: progress per phase
-  const byPhase:Record<string,{total:number;done:number}>={};
-  ms.forEach(m=>{if(!byPhase[m.phase])byPhase[m.phase]={total:0,done:0};byPhase[m.phase].total++;if(['Done','Completed'].includes(m.status))byPhase[m.phase].done++;});
-  const phaseRings=Object.entries(byPhase).map(([label,v],i)=>({
-    label,pct:v.total>0?(v.done/v.total)*100:0,
-    color:[D.green,D.blue,D.accent,D.orange][i%4],
-  }));
-
-  return(
-    <View style={ss.tc}>
-      {/* ── Top KPI stats ── */}
-      <View style={ss.srow}>
-        <BStat value={fmtPct(prog)}  label="PROGRESS"    color={D.blue}      bordered/>
-        <BStat value={String(cpi)}   label="CPI"         color={iColor(cpi)} sub={cpi>=1?'✓ on cost':'⚠ overrun'} bordered/>
-        <BStat value={String(spi)}   label="SPI"         color={iColor(spi)} sub={spi>=1?'✓ on time':'⚠ delayed'} bordered/>
-        <BStat value={fmtPct(bPct)}  label="BUDGET USED" color={bColor}      sub={`${fmt$M(spent)} / ${fmt$M(total)}`} bordered/>
-        <BStat value={String(issues.filter(i=>i.status==='Open').length)} label="OPEN ISSUES" color={openH>0?D.red:D.orange} bordered/>
-        <BStat value={String(workers.length)} label="WORKERS"  bordered/>
-        <BStat value={String(eq.length)}      label="EQUIPMENT" bordered/>
-        <BStat value={`${msDone}/${ms.length}`} label="MILESTONES" color={D.green} bordered/>
-      </View>
-
-      {/* ── Row 1: S-curve + CPI/SPI line + Issues donut ── */}
-      <View style={[ss.crow,{gap:24}]}>
-        {evm.length>=2&&(
-          <View style={ss.cb}>
-            <SL t="S-CURVE  —  EV · PV · AC  ($M)"/>
-            <LineChart
-              series={[
-                {data:evm.map(e=>Number(e.pv_usd)/1e6),color:D.muted, label:'PV'},
-                {data:evm.map(e=>Number(e.ev_usd)/1e6),color:D.green, label:'EV'},
-                {data:evm.map(e=>Number(e.ac_usd)/1e6),color:D.orange,label:'AC'},
-              ]}
-              w={380} h={150}
-            />
-            <View style={ss.legend}>
-              {([['PV',D.muted],['EV',D.green],['AC',D.orange]] as [string,string][]).map(([l,c])=>(
-                <View key={l} style={ss.legItem}><View style={[ss.legDot,{backgroundColor:c}]}/><Text style={ss.legTxt}>{l}</Text></View>
-              ))}
-            </View>
-          </View>
-        )}
-        {evm.length>=2&&(
-          <View style={ss.cb}>
-            <SL t="CPI / SPI TREND"/>
-            <LineChart
-              series={[
-                {data:evm.map(e=>Number(e.cpi)),color:iColor(cpi),label:'CPI'},
-                {data:evm.map(e=>Number(e.spi)),color:D.blue,     label:'SPI'},
-              ]}
-              w={240} h={150}
-            />
-            <View style={ss.legend}>
-              {([['CPI',iColor(cpi)],['SPI',D.blue]] as [string,string][]).map(([l,c])=>(
-                <View key={l} style={ss.legItem}><View style={[ss.legDot,{backgroundColor:c}]}/><Text style={ss.legTxt}>{l}</Text></View>
-              ))}
-            </View>
-          </View>
-        )}
-        <View style={ss.cb}>
-          <SL t="ISSUES BREAKDOWN"/>
-          <DonutChart
-            size={130}
-            label={String(issues.length)}
-            sublabel="total"
-            slices={[
-              {value:openH,  color:D.red,    label:'High'},
-              {value:openM,  color:D.orange, label:'Med'},
-              {value:openL,  color:D.yellow, label:'Low'},
-              {value:closedI,color:D.green,  label:'Closed'},
-            ]}
-          />
-        </View>
-      </View>
-
-      {/* ── Row 2: Workers donut + Schedule radial + Equipment donut ── */}
-      <View style={[ss.crow,{gap:32,marginTop:4}]}>
-        <View style={ss.cb}>
-          <SL t="WORKFORCE STATUS"/>
-          <DonutChart
-            size={130}
-            label={String(wActive)}
-            sublabel="active"
-            slices={[
-              {value:wActive,             color:D.green,  label:'Active'},
-              {value:workers.length-wActive,color:D.muted,label:'Inactive'},
-            ]}
-          />
-        </View>
-        {topDepts.length>0&&(
-          <View style={ss.cb}>
-            <SL t="WORKERS BY DEPT"/>
-            <ColChart
-              data={topDepts.map(([label,value])=>({label,value}))}
-              colors={[D.accent,D.blue,D.green,D.orange]}
-              w={240} h={140}
-            />
-          </View>
-        )}
-        {phaseRings.length>0&&(
-          <View style={ss.cb}>
-            <SL t="SCHEDULE BY PHASE"/>
-            <RadialBars items={phaseRings} size={130}/>
-          </View>
-        )}
-        <View style={ss.cb}>
-          <SL t="EQUIPMENT STATUS"/>
-          <DonutChart
-            size={130}
-            label={String(eqActive)}
-            sublabel="active"
-            slices={[
-              {value:eqActive,            color:D.blue,   label:'Active'},
-              {value:eqMaint,             color:D.orange, label:'Maint.'},
-              {value:eq.length-eqActive-eqMaint,color:D.muted,label:'Idle'},
-            ]}
-          />
-        </View>
-        <View style={ss.cb}>
-          <SL t="MILESTONE STATUS"/>
-          <DonutChart
-            size={130}
-            label={String(msDone)}
-            sublabel="done"
-            slices={[
-              {value:msDone,    color:D.green,  label:'Done'},
-              {value:msInProg,  color:D.blue,   label:'Active'},
-              {value:msDelayed, color:D.red,    label:'Delayed'},
-              {value:ms.length-msDone-msInProg-msDelayed,color:D.muted,label:'Pending'},
-            ]}
-          />
-        </View>
-      </View>
-    </View>
-  );
-}
-
-function TabWorkers({p,data}:{p:Project;data:SheetData}){
-  const workers=data.workers.filter(w=>w.project_id===p.project_id);
-  const active=workers.filter(w=>w.status==='Active').length;
-  const byDept:Record<string,number>={};
-  workers.forEach(w=>{byDept[w.department]=(byDept[w.department]??0)+1;});
-  const depts=Object.entries(byDept).sort((a,b)=>b[1]-a[1]).slice(0,8);
-  const byRole:Record<string,number>={};
-  workers.forEach(w=>{byRole[w.role]=(byRole[w.role]??0)+1;});
-  const roles=Object.entries(byRole).sort((a,b)=>b[1]-a[1]).slice(0,6);
-  const COLS=[D.blue,D.accent,D.green,D.orange,D.yellow,D.red,'#e91e63','#00bcd4'];
-  return(
-    <View style={ss.tc}>
-      <View style={ss.srow}>
-        <BStat value={String(workers.length)} label="TOTAL"    bordered/>
-        <BStat value={String(active)}         label="ACTIVE"   color={D.green} bordered/>
-        <BStat value={String(workers.length-active)} label="INACTIVE" color={workers.length-active>0?D.orange:D.muted} bordered/>
-        <BStat value={String(Object.keys(byDept).length)} label="DEPARTMENTS" bordered/>
-      </View>
-      <View style={ss.crow}>
-        <View style={ss.cb}>
-          <SL t="MANPOWER BY DEPARTMENT"/>
-          <ColChart data={depts.map(([label,value])=>({label,value}))} colors={COLS} w={420} h={130}/>
-        </View>
-        <View style={ss.cb}>
-          <SL t="TOP ROLES"/>
-          <HBars data={roles.map(([label,value],i)=>({label,value,color:COLS[i]}))} w={280} h={roles.length*26}/>
-        </View>
-      </View>
-    </View>
-  );
-}
-
-function TabEquipment({p,data}:{p:Project;data:SheetData}){
-  const eq=data.equipment.filter(e=>e.project_id===p.project_id);
-  const active=eq.filter(e=>e.status==='Active').length;
-  const maint=eq.filter(e=>e.status==='Maintenance').length;
-  const idle=eq.filter(e=>e.status==='Idle').length;
   const byType:Record<string,number>={};
   eq.forEach(e=>{byType[e.type]=(byType[e.type]??0)+1;});
-  const types=Object.entries(byType).sort((a,b)=>b[1]-a[1]);
-  const COLS=[D.blue,D.accent,D.green,D.orange,D.yellow,D.red];
-  return(
-    <View style={ss.tc}>
-      <View style={ss.srow}>
-        <BStat value={String(eq.length)} label="TOTAL"       bordered/>
-        <BStat value={String(active)}    label="ACTIVE"      color={D.green}  bordered/>
-        <BStat value={String(maint)}     label="MAINTENANCE" color={maint>0?D.orange:D.muted} bordered/>
-        <BStat value={String(idle)}      label="IDLE"        color={idle>0?D.yellow:D.muted} bordered/>
-      </View>
-      <View style={ss.crow}>
-        <View style={ss.cb}>
-          <SL t="BY EQUIPMENT TYPE"/>
-          <ColChart data={types.map(([label,value])=>({label,value}))} colors={COLS} w={420} h={130}/>
-        </View>
-        <View style={ss.cb}>
-          <SL t="STATUS MIX"/>
-          <HBars data={[
-            {label:'Active',     value:active, color:D.green,  max:eq.length},
-            {label:'Maintenance',value:maint,  color:D.orange, max:eq.length},
-            {label:'Idle',       value:idle,   color:D.yellow, max:eq.length},
-          ]} w={260} h={90}/>
-        </View>
-      </View>
-    </View>
-  );
-}
+  const types=Object.entries(byType).sort((a,b)=>b[1]-a[1]).slice(0,6);
+  const dailyCost=eq.filter(e=>e.status==='Active').reduce((s,e)=>s+Number(e.daily_cost_usd),0);
+  const utilPct=eq.length>0?Math.round((eqActive/eq.length)*100):0;
 
-function TabBudget({p,data}:{p:Project;data:SheetData}){
-  const rows=data.budget.filter(b=>b.project_id===p.project_id);
-  const byCat:Record<string,{plan:number;actual:number}>={};
-  rows.forEach(r=>{if(!byCat[r.category])byCat[r.category]={plan:0,actual:0};byCat[r.category].plan+=Number(r.planned_usd);byCat[r.category].actual+=Number(r.actual_usd);});
-  const cats=Object.entries(byCat).sort((a,b)=>b[1].actual-a[1].actual);
-  const totalP=cats.reduce((s,[,v])=>s+v.plan,0),totalA=cats.reduce((s,[,v])=>s+v.actual,0);
-  const variance=totalP-totalA;
-  const byMonth:Record<string,{p:number;a:number}>={};
-  rows.forEach(r=>{if(!byMonth[r.month])byMonth[r.month]={p:0,a:0};byMonth[r.month].p+=Number(r.planned_usd);byMonth[r.month].a+=Number(r.actual_usd);});
-  const months=Object.entries(byMonth).sort((a,b)=>a[0].localeCompare(b[0])).slice(-10);
+  const pad=12;
+  const innerW=w-pad*2;
+  const gap=8;
+
+  // Row proportions: gauge row | col chart | budget row
+  const row1H=Math.floor(h*0.32);
+  const row2H=Math.floor(h*0.44);
+  const row3H=h-row1H-row2H-gap*2-pad*2;
+
+  const gaugeSize=Math.min(row1H*1.1, innerW*0.45);
+
   return(
-    <View style={ss.tc}>
-      <View style={ss.srow}>
-        <BStat value={fmt$M(totalP)} label="PLANNED"  bordered/>
-        <BStat value={fmt$M(totalA)} label="ACTUAL"   color={totalA>totalP?D.red:D.green} bordered/>
-        <BStat value={fmt$M(Math.abs(variance))} label="VARIANCE" color={variance>=0?D.green:D.red} sub={variance>=0?'✓ under budget':'⚠ over budget'} bordered/>
-      </View>
-      <View style={ss.crow}>
-        {months.length>=2&&(
-          <View style={ss.cb}>
-            <SL t="MONTHLY PLANNED vs ACTUAL ($K)"/>
-            <LineChart
-              series={[
-                {data:months.map(([,v])=>v.p/1e3),color:D.muted, label:'Planned'},
-                {data:months.map(([,v])=>v.a/1e3),color:D.green, label:'Actual'},
-              ]}
-              w={420} h={130}
-            />
-            <View style={ss.legend}>
-              {[['Planned',D.muted],['Actual',D.green]].map(([l,c])=>(
-                <View key={l} style={ss.legItem}><View style={[ss.legDot,{backgroundColor:String(c)}]}/><Text style={ss.legTxt}>{l}</Text></View>
-              ))}
-            </View>
-          </View>
-        )}
-        <View style={ss.cb}>
-          <SL t="SPEND BY CATEGORY ($K)"/>
-          <HBars
-            data={cats.slice(0,6).map(([label,v])=>({label,value:Math.round(v.actual/1e3),color:v.actual>v.plan?D.red:D.green,max:Math.round(totalA/1e3)}))}
-            w={280} h={cats.slice(0,6).length*26}
+    <View style={{width:w,height:h,padding:pad,gap:gap,overflow:'hidden'}}>
+
+      {/* ROW 1: Utilization gauge + Active/Maint/Cost big boxes */}
+      <View style={{height:row1H,flexDirection:'row',gap:gap,alignItems:'stretch'}}>
+        <View style={{alignItems:'center',justifyContent:'center',backgroundColor:D.card,borderWidth:1,borderColor:D.border,padding:8}}>
+          <ArcGauge
+            pct={utilPct}
+            color={utilPct>70?D.blue:D.orange}
+            size={gaugeSize}
+            label={`${utilPct}%`}
+            sublabel="utilization"
           />
         </View>
-      </View>
-    </View>
-  );
-}
-
-function TabSchedule({p,data}:{p:Project;data:SheetData}){
-  const ms=data.schedule.filter(m=>m.project_id===p.project_id);
-  const done=ms.filter(m=>['Done','Completed'].includes(m.status)).length;
-  const delayed=ms.filter(m=>m.status==='Delayed').length;
-  const inProg=ms.filter(m=>m.status==='In Progress').length;
-  const byPhase:Record<string,{total:number;done:number}>={};
-  ms.forEach(m=>{if(!byPhase[m.phase])byPhase[m.phase]={total:0,done:0};byPhase[m.phase].total++;if(['Done','Completed'].includes(m.status))byPhase[m.phase].done++;});
-  const phases=Object.entries(byPhase);
-  const active=ms.filter(m=>['In Progress','Delayed'].includes(m.status)).sort((a,b)=>b.status.localeCompare(a.status)).slice(0,6);
-  return(
-    <View style={ss.tc}>
-      <View style={ss.srow}>
-        <BStat value={String(ms.length)} label="TOTAL"       bordered/>
-        <BStat value={String(done)}      label="DONE"        color={D.green}  bordered/>
-        <BStat value={String(inProg)}    label="IN PROGRESS" color={D.blue}   bordered/>
-        <BStat value={String(delayed)}   label="DELAYED"     color={delayed>0?D.red:D.muted} bordered/>
-        <BStat value={p.end_date}        label="DEADLINE"    bordered/>
-      </View>
-      <View style={ss.crow}>
-        {phases.length>0&&(
-          <View style={ss.cb}>
-            <SL t="COMPLETION BY PHASE (%)"/>
-            <HBars
-              data={phases.map(([label,v])=>({label,value:Math.round((v.done/v.total)*100),color:v.done===v.total?D.green:v.done===0?D.muted:D.blue,max:100}))}
-              w={320} h={phases.length*28}
-            />
-          </View>
-        )}
-        <View style={ss.cb}>
-          <SL t="ACTIVE MILESTONES"/>
-          <View style={{gap:8,marginTop:4}}>
-            {active.map(m=>(
-              <View key={m.milestone_id} style={{flexDirection:'row',alignItems:'flex-start',gap:8}}>
-                <View style={{width:8,height:8,backgroundColor:sColor(m.status),marginTop:3}}/>
-                <View style={{flex:1}}>
-                  <Text style={{color:D.text,fontSize:13,fontWeight:'600'}} numberOfLines={1}>{m.milestone_name}</Text>
-                  <Text style={{color:D.muted,fontSize:11}}>{m.phase} · {fmtPct(Number(m.progress_pct))}</Text>
-                </View>
-                <Text style={{color:sColor(m.status),fontSize:11,fontWeight:'700'}}>{m.status}</Text>
-              </View>
-            ))}
-          </View>
-        </View>
-      </View>
-    </View>
-  );
-}
-
-function TabCPI({p,data}:{p:Project;data:SheetData}){
-  const evm=data.evm.filter(e=>e.project_id===p.project_id);
-  const last=evm[evm.length-1];
-  const cpi=Number(p.cpi),spi=Number(p.spi);
-  return(
-    <View style={ss.tc}>
-      <View style={ss.srow}>
-        <BStat value={String(cpi)} label="CPI" color={iColor(cpi)} sub={cpi>=1?'✓ cost efficient':'⚠ cost overrun'} bordered/>
-        <BStat value={String(spi)} label="SPI" color={iColor(spi)} sub={spi>=1?'✓ on schedule':'⚠ behind'} bordered/>
-        {last&&<>
-          <BStat value={fmt$M(Number(last.ev_usd))} label="EV"  color={D.blue}   bordered/>
-          <BStat value={fmt$M(Number(last.ac_usd))} label="AC"  bordered/>
-          <BStat value={fmt$M(Number(last.pv_usd))} label="PV"  color={D.muted}  bordered/>
-          <BStat value={fmt$M(Number(last.eac_usd))}label="EAC" color={D.orange} bordered/>
-          <BStat value={fmt$M(Math.abs(Number(last.cv_usd)))} label="COST VAR" color={Number(last.cv_usd)>=0?D.green:D.red} sub={Number(last.cv_usd)>=0?'✓ under':'⚠ over'} bordered/>
-        </>}
-      </View>
-      {evm.length>=2&&(
-        <View style={ss.crow}>
-          <View style={ss.cb}>
-            <SL t="CPI / SPI TREND OVER TIME"/>
-            <LineChart
-              series={[
-                {data:evm.map(e=>Number(e.cpi)),color:iColor(cpi),label:'CPI'},
-                {data:evm.map(e=>Number(e.spi)),color:D.blue,     label:'SPI'},
-              ]}
-              w={460} h={140}
-            />
-            <View style={ss.legend}>
-              {[['CPI',iColor(cpi)],['SPI',D.blue]].map(([l,c])=>(
-                <View key={l} style={ss.legItem}><View style={[ss.legDot,{backgroundColor:String(c)}]}/><Text style={ss.legTxt}>{l}</Text></View>
-              ))}
+        <View style={{flex:1,gap:gap}}>
+          <View style={{flex:1,flexDirection:'row',gap:gap}}>
+            <View style={{flex:1,backgroundColor:D.card,borderWidth:1,borderColor:D.border,padding:10,alignItems:'center',justifyContent:'center'}}>
+              <Text style={{fontSize:fs*0.7,color:D.muted,letterSpacing:1,marginBottom:2}}>ACTIVE</Text>
+              <Text style={{fontSize:fs*2,fontWeight:'900',color:D.blue,lineHeight:fs*2.2}}>{eqActive}</Text>
+            </View>
+            <View style={{flex:1,backgroundColor:D.card,borderWidth:1,borderColor:D.border,padding:10,alignItems:'center',justifyContent:'center'}}>
+              <Text style={{fontSize:fs*0.7,color:D.muted,letterSpacing:1,marginBottom:2}}>MAINT.</Text>
+              <Text style={{fontSize:fs*2,fontWeight:'900',color:D.orange,lineHeight:fs*2.2}}>{eqMaint}</Text>
             </View>
           </View>
-          <View style={ss.cb}>
-            <SL t="EV vs AC vs PV ($M)"/>
-            <LineChart
-              series={[
-                {data:evm.map(e=>Number(e.pv_usd)/1e6),color:D.muted, label:'PV'},
-                {data:evm.map(e=>Number(e.ev_usd)/1e6),color:D.green, label:'EV'},
-                {data:evm.map(e=>Number(e.ac_usd)/1e6),color:D.orange,label:'AC'},
-              ]}
-              w={300} h={140}
-            />
-            <View style={ss.legend}>
-              {[['PV',D.muted],['EV',D.green],['AC',D.orange]].map(([l,c])=>(
-                <View key={l} style={ss.legItem}><View style={[ss.legDot,{backgroundColor:String(c)}]}/><Text style={ss.legTxt}>{l}</Text></View>
-              ))}
+          <View style={{flex:1,flexDirection:'row',gap:gap}}>
+            <View style={{flex:2,backgroundColor:D.card,borderWidth:1,borderColor:D.border,padding:10,justifyContent:'center'}}>
+              <Text style={{fontSize:fs*0.7,color:D.muted,letterSpacing:1,marginBottom:2}}>DAILY COST</Text>
+              <Text style={{fontSize:fs*1.6,fontWeight:'900',color:D.yellow}}>{fmt$M(dailyCost)}</Text>
+            </View>
+            <View style={{flex:1,backgroundColor:D.card,borderWidth:1,borderColor:D.border,padding:10,alignItems:'center',justifyContent:'center'}}>
+              <Text style={{fontSize:fs*0.7,color:D.muted,letterSpacing:1,marginBottom:2}}>TOTAL</Text>
+              <Text style={{fontSize:fs*1.6,fontWeight:'900',color:D.sub}}>{eq.length}</Text>
             </View>
           </View>
         </View>
-      )}
-    </View>
-  );
-}
-
-function TabReports({p,data}:{p:Project;data:SheetData}){
-  const allR=data.dailyReports.filter(r=>r.project_id===p.project_id);
-  const reports=[...allR].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,6);
-  const issues=data.issues.filter(i=>i.project_id===p.project_id);
-  const openH=issues.filter(i=>i.status==='Open'&&i.priority==='High').length;
-  const openM=issues.filter(i=>i.status==='Open'&&i.priority==='Medium').length;
-  const openL=issues.filter(i=>i.status==='Open'&&i.priority==='Low').length;
-  const closed=issues.filter(i=>i.status==='Resolved').length;
-  const incidents=reports.reduce((s,r)=>s+Number(r.incidents),0);
-  return(
-    <View style={ss.tc}>
-      <View style={ss.srow}>
-        <BStat value={String(allR.length)}     label="REPORTS"      bordered/>
-        <BStat value={String(openH)}           label="HIGH ISSUES"  color={openH>0?D.red:D.muted}    bordered/>
-        <BStat value={String(openM)}           label="MED ISSUES"   color={openM>0?D.orange:D.muted} bordered/>
-        <BStat value={String(incidents)}       label="INCIDENTS"    color={incidents>0?D.orange:D.green} bordered/>
-        <BStat value={String(closed)}          label="CLOSED"       color={D.green} bordered/>
       </View>
-      <View style={ss.crow}>
-        <View style={ss.cb}>
-          <SL t="ISSUES BY PRIORITY"/>
+
+      {/* ROW 2: Equipment by type — full width column chart */}
+      {types.length>0&&(
+        <View style={{height:row2H,backgroundColor:D.card,borderWidth:1,borderColor:D.border,padding:10}}>
+          <SL label="EQUIPMENT BY TYPE" color={D.blue}/>
           <ColChart
-            data={[{label:'High',value:openH},{label:'Medium',value:openM},{label:'Low',value:openL},{label:'Closed',value:closed}]}
-            colors={[D.red,D.orange,D.yellow,D.green]}
-            w={300} h={130}
+            data={types.map(([l,v])=>({label:l,value:v}))}
+            colors={[D.blue,D.accent,D.green,D.orange,D.yellow,'#e91e63']}
+            w={innerW-20}
+            h={row2H-28}
+            showVals
+            labelSize={12}
           />
         </View>
-        <View style={[ss.cb,{flex:1}]}>
-          <SL t="RECENT DAILY REPORTS"/>
-          <View style={{gap:7,marginTop:4}}>
-            {reports.map(r=>(
-              <View key={r.report_id} style={{flexDirection:'row',alignItems:'center',gap:8,borderBottomWidth:1,borderBottomColor:D.border,paddingBottom:6}}>
-                <Text style={{color:D.muted,fontSize:12,minWidth:80}}>{r.date}</Text>
-                <Text style={{flex:1,color:D.text,fontSize:13}} numberOfLines={1}>{r.work_summary||'—'}</Text>
-                {Number(r.incidents)>0&&<View style={{backgroundColor:D.redDim,paddingHorizontal:8,paddingVertical:2,}}>
-                  <Text style={{color:D.red,fontSize:11,fontWeight:'700'}}>⚠ {r.incidents}</Text>
-                </View>}
-              </View>
-            ))}
+      )}
+
+      {/* ROW 3: Budget donut + numbers */}
+      <View style={{height:row3H,flexDirection:'row',gap:gap,alignItems:'stretch'}}>
+        <View style={{flex:1,backgroundColor:D.card,borderWidth:1,borderColor:D.border,padding:10,alignItems:'center',justifyContent:'center',gap:6}}>
+          <Donut
+            slices={[{value:spent,color:D.blue},{value:Math.max(0,total-spent),color:D.border}]}
+            size={Math.min(row3H-40,80)}
+            label={`${Math.round(bPct)}%`}
+          />
+          <Text style={{fontSize:10,color:D.muted,letterSpacing:1}}>BUDGET USED</Text>
+        </View>
+        <View style={{flex:2,gap:gap}}>
+          <View style={{flex:1,backgroundColor:D.card,borderWidth:1,borderColor:D.border,padding:10,justifyContent:'center'}}>
+            <Text style={{fontSize:fs*0.7,color:D.muted,letterSpacing:1,marginBottom:2}}>SPENT</Text>
+            <Text style={{fontSize:fs*1.5,fontWeight:'900',color:D.text}}>{fmt$M(spent)}</Text>
+            <Text style={{fontSize:fs*0.75,color:D.muted}}>of {fmt$M(total)}</Text>
+          </View>
+          <View style={{flex:1,backgroundColor:bPct>90?D.redDim:bPct>75?'rgba(255,165,0,0.1)':D.card,borderWidth:1,borderColor:D.border,padding:10,justifyContent:'center'}}>
+            <Text style={{fontSize:fs*0.7,color:D.muted,letterSpacing:1,marginBottom:2}}>REMAINING</Text>
+            <Text style={{fontSize:fs*1.5,fontWeight:'900',color:bPct>90?D.red:D.green}}>{fmt$M(Math.max(0,total-spent))}</Text>
           </View>
         </View>
       </View>
+
     </View>
   );
 }
 
-// ── Tabs ──────────────────────────────────────────────────────────
-const TABS=[
-  {key:'overview', label:'Overview', icon:'grid-outline'          as const},
-  {key:'workers',  label:'Workers',  icon:'people-outline'        as const},
-  {key:'equip',    label:'Equipment',icon:'construct-outline'     as const},
-  {key:'budget',   label:'Budget',   icon:'cash-outline'          as const},
-  {key:'schedule', label:'Schedule', icon:'calendar-outline'      as const},
-  {key:'cpi',      label:'CPI / SPI',icon:'trending-up-outline'   as const},
-  {key:'reports',  label:'Reports',  icon:'document-text-outline' as const},
-];
-
-// ── Project Row ───────────────────────────────────────────────────
-
-// ── TV Collage ─────────────────────────────────────────────────────
-function TVCollage({p,data}:{p:Project;data:SheetData}){
-  const spent=Number(p.spent_to_date_usd),total=Number(p.total_budget_usd);
-  const bPct=total>0?(spent/total)*100:0;
-  const prog=Number(p.progress_pct),cpi=Number(p.cpi),spi=Number(p.spi);
-  const bColor=bPct>90?D.red:bPct>75?D.orange:D.green;
-
-  const evm=data.evm.filter(e=>e.project_id===p.project_id);
-  const issues=data.issues.filter(i=>i.project_id===p.project_id);
-  const openH=issues.filter(i=>i.status==='Open'&&i.priority==='High').length;
-  const openM=issues.filter(i=>i.status==='Open'&&i.priority==='Medium').length;
-  const openL=issues.filter(i=>i.status==='Open'&&i.priority==='Low').length;
-  const closedI=issues.filter(i=>i.status==='Resolved').length;
-
-  const workers=data.workers.filter(w=>w.project_id===p.project_id);
-  const wActive=workers.filter(w=>w.status==='Active').length;
-  const byDept:Record<string,number>={};
-  workers.forEach(w=>{byDept[w.department]=(byDept[w.department]??0)+1;});
-  const topDepts=Object.entries(byDept).sort((a,b)=>b[1]-a[1]).slice(0,6);
-
-  const eq=data.equipment.filter(e=>e.project_id===p.project_id);
-  const eqActive=eq.filter(e=>e.status==='Active').length;
-  const eqMaint=eq.filter(e=>e.status==='Maintenance').length;
-
-  const ms=data.schedule.filter(m=>m.project_id===p.project_id);
-  const msDone=ms.filter(m=>['Done','Completed'].includes(m.status)).length;
-  const msDelayed=ms.filter(m=>m.status==='Delayed').length;
-  const msInProg=ms.filter(m=>m.status==='In Progress').length;
-
-  const byPhase:Record<string,{total:number;done:number}>={};
-  ms.forEach(m=>{if(!byPhase[m.phase])byPhase[m.phase]={total:0,done:0};byPhase[m.phase].total++;if(['Done','Completed'].includes(m.status))byPhase[m.phase].done++;});
-  const phaseRings=Object.entries(byPhase).map(([label,v],i)=>({label,pct:v.total>0?(v.done/v.total)*100:0,color:[D.green,D.blue,D.accent,D.orange][i%4]}));
-
-  const CH=290;
-
+// ── Project row ─────────────────────────────────────────────────
+function ProjectRow({p,data,rowH,totalW}:{p:Project;data:SheetData;rowH:number;totalW:number}){
+  const sideW=Math.floor(totalW*0.33);
+  const midW=totalW-sideW*2-2;
+  // Font scale: based on both width and height so nothing overflows
+  const fs=Math.min(Math.floor(sideW/22), Math.floor(rowH/18), 18);
   return(
-    <View style={ss.collage}>
-
-      {/* Col 1: KPI stack */}
-      <View style={ss.colKpi}>
-        {[
-          {v:fmtPct(prog), l:'PROGRESS',   c:D.blue,      s:p.end_date},
-          {v:String(cpi),  l:'CPI',         c:iColor(cpi), s:cpi>=1?'✓ on cost':'⚠ overrun'},
-          {v:String(spi),  l:'SPI',         c:iColor(spi), s:spi>=1?'✓ on time':'⚠ delayed'},
-          {v:fmtPct(bPct), l:'BUDGET USED', c:bColor,      s:fmt$M(spent)+' / '+fmt$M(total)},
-          {v:String(issues.filter(i=>i.status==='Open').length),l:'OPEN ISSUES',c:openH>0?D.red:openM>0?D.orange:D.green,s:'H:'+openH+' M:'+openM},
-          {v:String(workers.length),l:'WORKERS',  c:D.text, s:wActive+' active'},
-          {v:String(eq.length),     l:'EQUIPMENT',c:D.text, s:eqActive+' active'},
-          {v:msDone+'/'+ms.length,  l:'MILESTONES',c:D.green,s:msDelayed>0?msDelayed+' delayed':'on track'},
-        ].map(({v,l,c,s})=>(
-          <View key={l} style={ss.kpiCell}>
-            <Text style={[ss.kpiV,{color:c}]}>{v}</Text>
-            <Text style={ss.kpiL}>{l}</Text>
-            <Text style={ss.kpiS}>{s}</Text>
-          </View>
-        ))}
+    <View style={{flexDirection:'row',height:rowH,overflow:'hidden'}}>
+      <View style={{width:sideW,borderRightWidth:1,borderRightColor:D.border}}>
+        <LeftDash p={p} data={data} w={sideW} h={rowH} fs={fs}/>
       </View>
-
-      {/* Col 2: S-Curve */}
-      {evm.length>=2&&(
-        <View style={[ss.cell,{flex:1.5}]}>
-          <SL t="S-CURVE  (EV · PV · AC, $M)"/>
-          <LineChart
-            series={[
-              {data:evm.map(e=>Number(e.pv_usd)/1e6),color:D.muted, label:'PV'},
-              {data:evm.map(e=>Number(e.ev_usd)/1e6),color:D.green, label:'EV'},
-              {data:evm.map(e=>Number(e.ac_usd)/1e6),color:D.orange,label:'AC'},
-            ]}
-            w={300} h={CH}
-          />
-          <View style={ss.legend}>
-            {([['PV',D.muted],['EV',D.green],['AC',D.orange]] as [string,string][]).map(([l,c])=>(
-              <View key={l} style={ss.legItem}><View style={[ss.legDot,{backgroundColor:c}]}/><Text style={ss.legTxt}>{l}</Text></View>
-            ))}
-          </View>
-        </View>
-      )}
-
-      {/* Col 3: CPI/SPI trend */}
-      {evm.length>=2&&(
-        <View style={[ss.cell,{flex:1.2}]}>
-          <SL t="CPI / SPI TREND"/>
-          <LineChart
-            series={[
-              {data:evm.map(e=>Number(e.cpi)),color:iColor(cpi),label:'CPI'},
-              {data:evm.map(e=>Number(e.spi)),color:D.blue,     label:'SPI'},
-            ]}
-            w={240} h={CH}
-          />
-          <View style={ss.legend}>
-            {([['CPI',iColor(cpi)],['SPI',D.blue]] as [string,string][]).map(([l,c])=>(
-              <View key={l} style={ss.legItem}><View style={[ss.legDot,{backgroundColor:c}]}/><Text style={ss.legTxt}>{l}</Text></View>
-            ))}
-          </View>
-        </View>
-      )}
-
-      {/* Col 4: Workforce bars */}
-      {topDepts.length>0&&(
-        <View style={[ss.cell,{flex:1.2}]}>
-          <SL t="WORKFORCE BY DEPT"/>
-          <ColChart
-            data={topDepts.map(([label,value])=>({label,value}))}
-            colors={[D.accent,D.blue,D.green,D.orange,D.yellow,'#e91e63']}
-            w={240} h={CH}
-          />
-        </View>
-      )}
-
-      {/* Col 5: Issues + Equipment donuts */}
-      <View style={[ss.cell,{flex:1,justifyContent:'space-around',alignItems:'center',overflow:'hidden'}]}>
-        <View style={{alignItems:'center',gap:4}}>
-          <SL t="ISSUES"/>
-          <DonutChart size={130} label={String(issues.length)} sublabel="total"
-            slices={[{value:openH,color:D.red,label:'H'},{value:openM,color:D.orange,label:'M'},{value:openL,color:D.yellow,label:'L'},{value:closedI,color:D.green,label:'✓'}]}/>
-        </View>
-        <View style={{alignItems:'center',gap:4}}>
-          <SL t="EQUIPMENT"/>
-          <DonutChart size={130} label={String(eqActive)} sublabel="active"
-            slices={[{value:eqActive,color:D.blue,label:'Active'},{value:eqMaint,color:D.orange,label:'Maint'},{value:eq.length-eqActive-eqMaint,color:D.muted,label:'Idle'}]}/>
-        </View>
+      <View style={{width:midW}}>
+        <CamFeed name={p.project_name} w={midW} h={rowH}/>
       </View>
-
-      {/* Col 6: Schedule phases radial */}
-      {phaseRings.length>0&&(
-        <View style={[ss.cell,{flex:0.95,alignItems:'center',justifyContent:'center'}]}>
-          <SL t="SCHEDULE PHASES"/>
-          <RadialBars items={phaseRings} size={200}/>
-        </View>
-      )}
-
-      {/* Col 7: Milestone donut */}
-      <View style={[ss.cell,{flex:0.85,alignItems:'center',justifyContent:'center'}]}>
-        <SL t="MILESTONES"/>
-        <DonutChart size={160} label={msDone+'/'+ms.length} sublabel="done"
-          slices={[{value:msDone,color:D.green,label:'Done'},{value:msInProg,color:D.blue,label:'Active'},{value:msDelayed,color:D.red,label:'Delayed'},{value:ms.length-msDone-msInProg-msDelayed,color:D.muted,label:'Pending'}]}/>
+      <View style={{width:sideW,borderLeftWidth:1,borderLeftColor:D.border}}>
+        <RightDash p={p} data={data} w={sideW} h={rowH} fs={fs}/>
       </View>
-
     </View>
   );
 }
 
-
-function ProjectRow({p,data}:{p:Project;data:SheetData}){
-  const prog=Number(p.progress_pct);
-  const cpi=Number(p.cpi),spi=Number(p.spi);
-
-  return(
-    <View style={ss.row}>
-      {/* Sidebar */}
-      <View style={ss.sidebar}>
-        <View style={{flexDirection:'row',alignItems:'center',gap:5,marginBottom:6}}>
-          <View style={{width:9,height:9,backgroundColor:sColor(p.status)}}/>
-          <Text style={{fontSize:11,color:D.muted,fontWeight:'700',letterSpacing:1}}>{p.status.toUpperCase()}</Text>
-        </View>
-        <Text style={ss.sname} numberOfLines={2}>{p.project_name}</Text>
-        <Text style={ss.smeta}>{p.location}</Text>
-        <Text style={ss.smeta}>{p.client}</Text>
-        <View style={{alignItems:'center',marginTop:8}}>
-          <ArcGauge pct={prog} color={D.blue} size={110} label={fmtPct(prog)} sublabel="overall progress"/>
-        </View>
-        <View style={{flexDirection:'row',gap:6,marginTop:8,flexWrap:'wrap'}}>
-          <View style={[ss.pill,{backgroundColor:cpi>=1?D.greenDim:D.redDim}]}>
-            <Text style={[ss.pillT,{color:iColor(cpi)}]}>CPI {cpi}</Text>
-          </View>
-          <View style={[ss.pill,{backgroundColor:spi>=1?D.greenDim:D.redDim}]}>
-            <Text style={[ss.pillT,{color:iColor(spi)}]}>SPI {spi}</Text>
-          </View>
-        </View>
-      </View>
-
-      {/* TV collage — no tabs, all at once */}
-      <TVCollage p={p} data={data}/>
-    </View>
-  );
-}
-
-// ── Main ──────────────────────────────────────────────────────────
+// ── Main ────────────────────────────────────────────────────────
 export default function HomeScreen(){
   const {data,loading,error,refresh}=useSheetData();
-  const {width}=useWindowDimensions();
+  const {width,height}=useWindowDimensions();
   const router=useRouter();
   const isTV=Platform.OS==='web'&&width>=900;
 
   if(loading)return(
-    <View style={[ss.screen,{alignItems:'center',justifyContent:'center'}]}>
-      <Text style={{color:D.muted,fontSize:22,letterSpacing:3}}>LOADING DATA...</Text>
+    <View style={{flex:1,backgroundColor:D.bg,alignItems:'center',justifyContent:'center'}}>
+      <Text style={{color:D.muted,fontSize:20,letterSpacing:4}}>LOADING DATA...</Text>
     </View>
   );
   if(error||!data)return(
-    <View style={[ss.screen,{alignItems:'center',justifyContent:'center',gap:16}]}>
-      <Text style={{color:D.red,fontSize:18}}>⚠ {error??'No data'}</Text>
-      <TouchableOpacity onPress={refresh} style={{padding:12,backgroundColor:D.card,}}>
+    <View style={{flex:1,backgroundColor:D.bg,alignItems:'center',justifyContent:'center',gap:16}}>
+      <Text style={{color:D.red,fontSize:16}}>⚠ {error??'No data'}</Text>
+      <TouchableOpacity onPress={refresh} style={{padding:12,backgroundColor:D.card,borderWidth:1,borderColor:D.border}}>
         <Text style={{color:D.text}}>Retry</Text>
       </TouchableOpacity>
     </View>
   );
 
   if(isTV){
+    const n=Math.min(data.projects.length,3);
+    const rowH=Math.floor(height/n);
     return(
-      <View style={ss.screen}>
-        <Stack.Screen options={{ headerShown: false }} />
-        {data.projects.slice(0,3).map((p,i)=>(
+      <View style={{flex:1,backgroundColor:D.bg,height}}>
+        <Stack.Screen options={{headerShown:false}}/>
+        {data.projects.slice(0,n).map((p,i)=>(
           <React.Fragment key={p.project_id}>
-            <ProjectRow p={p} data={data}/>
-            {i<2&&<View style={{height:1,backgroundColor:D.border}}/>}
+            <ProjectRow p={p} data={data} rowH={rowH} totalW={width}/>
+            {i<n-1&&<View style={{height:1,backgroundColor:D.border}}/>}
           </React.Fragment>
         ))}
       </View>
     );
   }
 
+  // Mobile
   return(
-    <ScrollView style={{flex:1,backgroundColor:D.bg}} contentContainerStyle={{padding:16,gap:12}}>
-      <Stack.Screen options={{
-        headerShown: true,
-        title: 'ISKER',
-        headerTitleAlign: 'center',
-        headerStyle: { backgroundColor: D.panel },
-        headerTitleStyle: { color: D.text, fontWeight: '800', fontSize: 18, letterSpacing: 3 },
-        headerShadowVisible: false,
-      }} />
-      {data.projects.map(p=>(
-        <TouchableOpacity key={p.project_id}
-          style={{backgroundColor:D.card,padding:16,borderWidth:1,borderColor:D.border}}
-          onPress={()=>router.push({pathname:'/project/[id]',params:{id:p.project_id}})}>
-          <View style={{flexDirection:'row',alignItems:'center',gap:6,marginBottom:6}}>
-            <View style={{width:8,height:8,backgroundColor:sColor(p.status)}}/>
-            <Text style={{color:D.text,fontSize:16,fontWeight:'700',flex:1}}>{p.project_name}</Text>
-          </View>
-          <Text style={{color:D.muted,fontSize:12,marginBottom:10}}>{p.location} · {p.client}</Text>
-          <ArcGauge pct={Number(p.progress_pct)} color={D.blue} size={100} label={fmtPct(Number(p.progress_pct))} sublabel="progress"/>
-        </TouchableOpacity>
-      ))}
+    <ScrollView style={{flex:1,backgroundColor:D.bg}} contentContainerStyle={{padding:14,gap:12}}>
+      <Stack.Screen options={{headerShown:true,title:'ISKER',headerTitleAlign:'center',
+        headerStyle:{backgroundColor:D.panel},
+        headerTitleStyle:{color:D.text,fontWeight:'800',fontSize:16,letterSpacing:3},
+        headerShadowVisible:false}}/>
+      {data.projects.map(p=>{
+        const prog=Number(p.progress_pct),cpi=Number(p.cpi);
+        return(
+          <TouchableOpacity key={p.project_id}
+            style={{backgroundColor:D.card,borderWidth:1,borderColor:D.border,padding:14,gap:10}}
+            onPress={()=>router.push({pathname:'/project/[id]',params:{id:p.project_id}})}>
+            <View style={{flexDirection:'row',alignItems:'center',gap:6}}>
+              <View style={{width:8,height:8,borderRadius:4,backgroundColor:sCol(p.status)}}/>
+              <Text style={{color:sCol(p.status),fontSize:10,fontWeight:'700',letterSpacing:1}}>{p.status.toUpperCase()}</Text>
+            </View>
+            <Text style={{color:D.text,fontSize:16,fontWeight:'800'}}>{p.project_name}</Text>
+            <Text style={{color:D.muted,fontSize:11}}>{p.location}</Text>
+            <View style={{alignItems:'center'}}>
+              <ArcGauge pct={prog} color={D.blue} size={120} label={fmtP(prog)} sublabel="progress"/>
+            </View>
+            <View style={{flexDirection:'row',gap:8}}>
+              <View style={{flex:1,backgroundColor:cpi>=1?D.greenDim:D.redDim,padding:8,alignItems:'center'}}>
+                <Text style={{fontSize:14,fontWeight:'800',color:iCol(cpi)}}>CPI {cpi}</Text>
+              </View>
+              <View style={{flex:1,backgroundColor:Number(p.spi)>=1?D.greenDim:D.redDim,padding:8,alignItems:'center'}}>
+                <Text style={{fontSize:14,fontWeight:'800',color:iCol(Number(p.spi))}}>SPI {p.spi}</Text>
+              </View>
+            </View>
+          </TouchableOpacity>
+        );
+      })}
     </ScrollView>
   );
 }
-
-// ── Styles ────────────────────────────────────────────────────────
-const ss=StyleSheet.create({
-  screen:   {flex:1,backgroundColor:D.bg},
-  row:      {flex:1,flexDirection:'row'},
-  sidebar:  {width:220,padding:14,backgroundColor:D.panel,borderRightWidth:1,borderRightColor:D.border},
-  sname:    {fontSize:16,fontWeight:'800',color:D.text,lineHeight:22,marginBottom:4},
-  smeta:    {fontSize:11,color:D.muted,marginBottom:2},
-  pill:     {paddingHorizontal:10,paddingVertical:4,},
-  pillT:    {fontSize:13,fontWeight:'700'},
-  tabbar:   {flexDirection:'row',backgroundColor:D.panel,borderBottomWidth:1,borderBottomColor:D.border,paddingHorizontal:4},
-  tabbtn:   {flexDirection:'row',alignItems:'center',gap:5,paddingVertical:9,paddingHorizontal:13,borderBottomWidth:2,borderBottomColor:'transparent'},
-  tabactive:{borderBottomColor:D.accent},
-  tablab:   {fontSize:13,color:D.muted,fontWeight:'500'},
-  tablabA:  {color:D.accent,fontWeight:'700'},
-  // Tab content
-  // TV collage
-  collage:  {flex:1,flexDirection:'row',padding:6,gap:6},
-  cell:     {flex:1,backgroundColor:D.card,padding:10,borderWidth:1,borderColor:D.border,overflow:'hidden'},
-  colKpi:   {width:155,gap:3},
-  kpiCell:  {flex:1,backgroundColor:D.card,paddingHorizontal:8,paddingVertical:3,borderWidth:1,borderColor:D.border,justifyContent:'center',overflow:'hidden'},
-  kpiV:     {fontSize:20,fontWeight:'800',color:D.text,lineHeight:22},
-  kpiL:     {fontSize:10,color:D.muted,textTransform:'uppercase',letterSpacing:0.5},
-  kpiS:     {fontSize:10,color:D.muted},
-  srow:     {flexDirection:'row',gap:8,flexWrap:'wrap'},
-  bstat:    {backgroundColor:D.card,paddingVertical:12,paddingHorizontal:16,alignItems:'center',minWidth:100,borderWidth:1,borderColor:D.border},
-  bval:     {fontSize:32,fontWeight:'800',color:D.text},
-  blab:     {fontSize:12,color:D.muted,marginTop:3,textTransform:'uppercase',letterSpacing:0.6},
-  bsub:     {fontSize:11,marginTop:2},
-  crow:     {flexDirection:'row',gap:24,alignItems:'flex-start',flexWrap:'wrap'},
-  cb:       {alignItems:'flex-start',gap:4},
-  sl:       {fontSize:15,color:D.sub,letterSpacing:0.8,textTransform:'uppercase',marginBottom:8,fontWeight:'700'},
-  legend:   {flexDirection:'row',gap:16,marginTop:6},
-  legItem:  {flexDirection:'row',alignItems:'center',gap:6},
-  legDot:   {width:14,height:4,},
-  legTxt:   {fontSize:14,color:D.sub},
-});

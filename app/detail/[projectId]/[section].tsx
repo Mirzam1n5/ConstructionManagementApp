@@ -97,38 +97,25 @@ function RingStatRow({ rings }: {
   rings: { label: string; value: string; pct: number; color?: string }[];
 }) {
   const { isTV } = useLayout();
-  const ringSize = isTV ? 80 : 68;
+  const ringSize = isTV ? 90 : 72;
 
-  const inner = (
-    <View style={[styles.ringRow, isTV && { justifyContent: 'space-around' }]}>
+  return (
+    <View style={styles.ringRow}>
       {rings.map((r, i) => (
         <View key={i} style={styles.ringItem}>
           <DonutChart
             segments={[
               { value: Math.max(r.pct, 1), color: r.color ?? COLORS.accent, label: '' },
-              { value: Math.max(100 - r.pct, 0), color: '#e8e8e8', label: '' },
+              { value: Math.max(100 - r.pct, 0), color: COLORS.border, label: '' },
             ]}
             size={ringSize}
             label={r.value}
           />
-          <Text style={styles.ringLbl}>{r.label}</Text>
+          <Text style={styles.ringLabel}>{r.label}</Text>
         </View>
       ))}
     </View>
   );
-
-  if (!isTV && rings.length > 2) {
-    return (
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 2, minWidth: '100%' }}
-      >
-        {inner}
-      </ScrollView>
-    );
-  }
-  return inner;
 }
 
 // Legend pill row
@@ -947,8 +934,8 @@ const styles = StyleSheet.create({
   aName:     { fontSize: FONT.size.sm, fontWeight: '600', color: COLORS.white },
   aRole:     { fontSize: FONT.size.xs, color: COLORS.sub, marginTop: 1 },
   rateTag:   { fontSize: FONT.size.xs, fontWeight: '600', color: COLORS.white },
-  ringRow:   { flexDirection: 'row', justifyContent: 'space-around', paddingVertical: 8 },
-  ringItem:  { alignItems: 'center', gap: 6 },
-  ringLabel: { fontSize: 10, color: COLORS.sub, textAlign: 'center', maxWidth: 70 },
+  ringRow:   { flexDirection: 'row', justifyContent: 'space-evenly', alignItems: 'flex-start', paddingVertical: 8 },
+  ringItem:  { alignItems: 'center', gap: 8, flex: 1 },
+  ringLabel: { fontSize: 11, color: COLORS.white, textAlign: 'center', fontWeight: '500' },
   budgetDonutRow: { flexDirection: 'row', alignItems: 'center' },
 });
