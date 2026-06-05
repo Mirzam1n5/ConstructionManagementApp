@@ -5,14 +5,14 @@ import Svg, { Path, Circle, G, Text as ST, Line, Defs, LinearGradient, Stop, Rec
 import { useSheetData, Project, SheetData } from '../hooks/useSheetData';
 
 const D = {
-  bg:'#07080f', panel:'#0d0e1a', card:'#13141f', border:'#22233a',
-  text:'#eeeef8', sub:'#8888aa', muted:'#44445a',
-  green:'#00e676', greenDim:'#0a2618',
-  red:'#ff4444',   redDim:'#280a0a',
-  yellow:'#ffd740',yellowDim:'#2a2000',
-  blue:'#4fc3f7',  blueDim:'#072030',
-  accent:'#7c6af7',accentDim:'#1a1640',
-  orange:'#ff9100',orangeDim:'#271500',
+  bg:'#0c0d14', panel:'#111220', card:'#161724', border:'#20223a',
+  text:'#dfe0ef', sub:'#7878a0', muted:'#404058',
+  green:'#4caf7d', greenDim:'#0d2118',
+  red:'#e05c5c',   redDim:'#200e0e',
+  yellow:'#d4a843',yellowDim:'#211a08',
+  blue:'#5b9bd5',  blueDim:'#0a1a2e',
+  accent:'#7c78c8',accentDim:'#151430',
+  orange:'#d4845a',orangeDim:'#1e1008',
 };
 
 const fmt$M=(v:number)=>v>=1e6?`$${(v/1e6).toFixed(1)}M`:v>=1e3?`$${(v/1e3).toFixed(0)}K`:`$${v}`;
@@ -45,7 +45,7 @@ function ArcGauge({pct,color,size=140,label,sublabel,plan}:{pct:number;color:str
   const S=210,ARC=240;
   function apt(deg:number){return{x:cx+r*Math.cos(toRad(deg)),y:cy+r*Math.sin(toRad(deg))};}
   function ap(f:number,t:number){const s=apt(f),e=apt(t),lg=t-f>180?1:0;return`M${s.x},${s.y} A${r},${r} 0 ${lg} 1 ${e.x},${e.y}`;}
-  const SEGS=[{f:210,t:258,c:'#e53935'},{f:258,t:306,c:'#fb8c00'},{f:306,t:354,c:'#fdd835'},{f:354,t:402,c:'#7cb342'},{f:402,t:450,c:'#00c853'}];
+  const SEGS=[{f:210,t:258,c:'#e53935'},{f:258,t:306,c:'#fb8c00'},{f:306,t:354,c:'#fdd835'},{f:354,t:402,c:'#7cb342'},{f:402,t:450,c:'#3d9e6a'}];
   const endD=S+ARC*p;
   const nr=toRad(endD),nL=r*0.8;
   const tx=cx+nL*Math.cos(nr),ty=cy+nL*Math.sin(nr);
@@ -246,39 +246,69 @@ function MBox({label,value,color=D.text,sub}:{label:string;value:string;color?:s
 }
 
 // ── Camera feed ─────────────────────────────────────────────────
-function CamFeed({name,w,h}:{name:string;w:number;h:number}){
+function CamFeed({name,w,h,camIndex}:{name:string;w:number;h:number;camIndex:number}){
   const [t,setT]=useState(new Date());
   useEffect(()=>{const id=setInterval(()=>setT(new Date()),1000);return()=>clearInterval(id);},[]);
+
+  // Camera sources per project index
+  const CAM_SRCS: Record<number, {src:string;title:string}> = {
+    0: {
+      src: 'https://camstreamer.com/embed/Jk8ZAenEHp16Tu0nqNUbuESPwr6HKmFqOcEisSYH?rel=0',
+      title: 'Site Camera 1',
+    },
+    1: {
+      src: 'https://camstreamer.com/embed/l85zj34Vvs9BT5P2sOGJfVGsrswlzWseyrnmOrrl?rel=0',
+      title: 'Site Camera 2',
+    },
+    2: {
+      src: 'https://camstreamer.com/embed/Ti2l4rKD7KE1vP6Utj6ffCHDzAWUtbD8CMIQDdK4?rel=0',
+      title: 'Site Camera 3',
+    },
+  };
+
+  const cam = CAM_SRCS[camIndex] ?? CAM_SRCS[0];
+
+  if(Platform.OS !== 'web'){
+    // Mobile fallback — placeholder
+    return(
+      <View style={{width:w,height:h,backgroundColor:'#000',borderWidth:1,borderColor:D.border,alignItems:'center',justifyContent:'center'}}>
+        <Text style={{color:D.muted,fontSize:11,letterSpacing:2}}>CAM FEED</Text>
+        <Text style={{color:D.border,fontSize:9,marginTop:4}}>{cam.title}</Text>
+      </View>
+    );
+  }
+
   return(
     <View style={{width:w,height:h,backgroundColor:'#000',borderWidth:1,borderColor:D.border,overflow:'hidden',position:'relative'}}>
-      <View style={{position:'absolute',top:0,left:0,right:0,flexDirection:'row',alignItems:'center',justifyContent:'space-between',paddingHorizontal:10,paddingVertical:6,backgroundColor:'rgba(0,0,0,0.75)',zIndex:2}}>
+      {/* Top overlay bar */}
+      <View style={{position:'absolute',top:0,left:0,right:0,flexDirection:'row',alignItems:'center',
+        justifyContent:'space-between',paddingHorizontal:10,paddingVertical:5,
+        backgroundColor:'rgba(0,0,0,0.72)',zIndex:2,pointerEvents:'none'}}>
         <View style={{flexDirection:'row',alignItems:'center',gap:5}}>
           <View style={{width:7,height:7,borderRadius:3.5,backgroundColor:D.red}}/>
-          <Text style={{color:D.text,fontSize:11,fontWeight:'700',letterSpacing:1}}>● LIVE</Text>
+          <Text style={{color:D.text,fontSize:11,fontWeight:'700',letterSpacing:1}}>LIVE</Text>
         </View>
         <Text style={{color:D.sub,fontSize:10,letterSpacing:1}}>{name.toUpperCase()}</Text>
         <Text style={{color:D.muted,fontSize:10}}>{t.toLocaleTimeString()}</Text>
       </View>
-      <View style={{flex:1,alignItems:'center',justifyContent:'center',gap:8}}>
-        <View style={{width:h*0.22,height:h*0.16,borderWidth:1.5,borderColor:D.muted,alignItems:'center',justifyContent:'center'}}>
-          <View style={{width:h*0.08,height:h*0.08,borderRadius:h*0.04,borderWidth:1.5,borderColor:D.muted}}/>
-        </View>
-        <Text style={{color:D.muted,fontSize:10,letterSpacing:3}}>CAM 01</Text>
-        <Text style={{color:D.border,fontSize:9}}>SITE CAMERA FEED</Text>
-      </View>
-      {Array.from({length:Math.floor(h/4)}).map((_,i)=>(
-        <View key={i} style={{position:'absolute',left:0,right:0,top:i*4,height:1,backgroundColor:'#fff',opacity:0.015}}/>
-      ))}
+      {/* iframe */}
+      <iframe
+        src={cam.src}
+        title={cam.title}
+        style={{width:'100%',height:'100%',border:'none',display:'block'}}
+        allow="autoplay; fullscreen; picture-in-picture"
+        allowFullScreen
+      />
+      {/* Corner brackets */}
       {([{top:8,left:8},{top:8,right:8},{bottom:8,left:8},{bottom:8,right:8}] as any[]).map((pos,i)=>(
-        <View key={i} style={{position:'absolute',...pos,width:h*0.07,height:h*0.07,
+        <View key={i} style={{position:'absolute',...pos,width:16,height:16,
           borderTopWidth:pos.top!==undefined?1.5:0,borderBottomWidth:pos.bottom!==undefined?1.5:0,
           borderLeftWidth:pos.left!==undefined?1.5:0,borderRightWidth:pos.right!==undefined?1.5:0,
-          borderColor:D.accent}}/>
+          borderColor:D.accent,pointerEvents:'none',zIndex:3}}/>
       ))}
     </View>
   );
 }
-
 // ── LEFT column dashboard ───────────────────────────────────────
 function LeftDash({p,data,w,h,fs=14}:{p:Project;data:SheetData;w:number;h:number;fs?:number}){
   const prog=Number(p.progress_pct),cpi=Number(p.cpi),spi=Number(p.spi);
@@ -384,8 +414,8 @@ function RightDash({p,data,w,h,fs=14}:{p:Project;data:SheetData;w:number;h:numbe
   const gap=8;
 
   // Row proportions: gauge row | col chart | budget row
-  const row1H=Math.floor(h*0.32);
-  const row2H=Math.floor(h*0.44);
+  const row1H=Math.floor(h*0.30);
+  const row2H=Math.floor(h*0.42);
   const row3H=h-row1H-row2H-gap*2-pad*2;
 
   const gaugeSize=Math.min(row1H*1.1, innerW*0.45);
@@ -462,27 +492,19 @@ function RightDash({p,data,w,h,fs=14}:{p:Project;data:SheetData;w:number;h:numbe
         </View>
       )}
 
-      {/* ROW 3: Budget donut + numbers */}
-      <View style={{height:row3H,flexDirection:'row',gap:gap,alignItems:'stretch'}}>
-        <View style={{flex:1,backgroundColor:D.card,borderWidth:1,borderColor:D.border,padding:10,alignItems:'center',justifyContent:'center',gap:6}}>
-          <Donut
-            slices={[{value:spent,color:D.blue},{value:Math.max(0,total-spent),color:D.border}]}
-            size={Math.min(row3H-40,80)}
-            label={`${Math.round(bPct)}%`}
-          />
-          <Text style={{fontSize:10,color:D.muted,letterSpacing:1}}>BUDGET USED</Text>
-        </View>
-        <View style={{flex:2,gap:gap}}>
-          <View style={{flex:1,backgroundColor:D.card,borderWidth:1,borderColor:D.border,padding:10,justifyContent:'center'}}>
-            <Text style={{fontSize:fs*0.7,color:D.muted,letterSpacing:1,marginBottom:2}}>SPENT</Text>
-            <Text style={{fontSize:fs*1.5,fontWeight:'900',color:D.text}}>{fmt$M(spent)}</Text>
-            <Text style={{fontSize:fs*0.75,color:D.muted}}>of {fmt$M(total)}</Text>
+      {/* ROW 3: Budget — горизонтально, 3 ячейки в ряд */}
+      <View style={{height:row3H,flexDirection:'row',gap:gap}}>
+        {[
+          {label:'BUDGET USED', value:`${Math.round(bPct)}%`, color:bPct>90?D.red:bPct>75?D.orange:D.blue},
+          {label:'SPENT',       value:fmt$M(spent),           color:D.text,  sub:fmt$M(total)},
+          {label:'REMAINING',   value:fmt$M(Math.max(0,total-spent)), color:bPct>90?D.red:D.green},
+        ].map(({label,value,color,sub})=>(
+          <View key={label} style={{flex:1,backgroundColor:D.card,borderWidth:1,borderColor:D.border,padding:8,justifyContent:'center',alignItems:'center',overflow:'hidden'}}>
+            <Text style={{fontSize:fs*0.65,color:D.muted,letterSpacing:0.8,marginBottom:2,textAlign:'center'}}>{label}</Text>
+            <Text style={{fontSize:Math.min(fs*1.4, row3H*0.45),fontWeight:'900',color,textAlign:'center'}} numberOfLines={1} adjustsFontSizeToFit>{value}</Text>
+            {sub&&<Text style={{fontSize:fs*0.65,color:D.muted,marginTop:1}}>{sub}</Text>}
           </View>
-          <View style={{flex:1,backgroundColor:bPct>90?D.redDim:bPct>75?'rgba(255,165,0,0.1)':D.card,borderWidth:1,borderColor:D.border,padding:10,justifyContent:'center'}}>
-            <Text style={{fontSize:fs*0.7,color:D.muted,letterSpacing:1,marginBottom:2}}>REMAINING</Text>
-            <Text style={{fontSize:fs*1.5,fontWeight:'900',color:bPct>90?D.red:D.green}}>{fmt$M(Math.max(0,total-spent))}</Text>
-          </View>
-        </View>
+        ))}
       </View>
 
     </View>
@@ -490,18 +512,18 @@ function RightDash({p,data,w,h,fs=14}:{p:Project;data:SheetData;w:number;h:numbe
 }
 
 // ── Project row ─────────────────────────────────────────────────
-function ProjectRow({p,data,rowH,totalW}:{p:Project;data:SheetData;rowH:number;totalW:number}){
+function ProjectRow({p,data,rowH,totalW,camIndex}:{p:Project;data:SheetData;rowH:number;totalW:number;camIndex:number}){
   const sideW=Math.floor(totalW*0.33);
   const midW=totalW-sideW*2-2;
-  // Font scale: based on both width and height so nothing overflows
-  const fs=Math.min(Math.floor(sideW/22), Math.floor(rowH/18), 18);
+  // fs: conservative — min of width-based and height-based, hard cap 16
+  const fs=Math.max(9, Math.min(Math.floor(sideW/24), Math.floor(rowH/20), 16));
   return(
     <View style={{flexDirection:'row',height:rowH,overflow:'hidden'}}>
       <View style={{width:sideW,borderRightWidth:1,borderRightColor:D.border}}>
         <LeftDash p={p} data={data} w={sideW} h={rowH} fs={fs}/>
       </View>
       <View style={{width:midW}}>
-        <CamFeed name={p.project_name} w={midW} h={rowH}/>
+        <CamFeed name={p.project_name} w={midW} h={rowH} camIndex={camIndex}/>
       </View>
       <View style={{width:sideW,borderLeftWidth:1,borderLeftColor:D.border}}>
         <RightDash p={p} data={data} w={sideW} h={rowH} fs={fs}/>
@@ -539,7 +561,7 @@ export default function HomeScreen(){
         <Stack.Screen options={{headerShown:false}}/>
         {data.projects.slice(0,n).map((p,i)=>(
           <React.Fragment key={p.project_id}>
-            <ProjectRow p={p} data={data} rowH={rowH} totalW={width}/>
+            <ProjectRow p={p} data={data} rowH={rowH} totalW={width} camIndex={i}/>
             {i<n-1&&<View style={{height:1,backgroundColor:D.border}}/>}
           </React.Fragment>
         ))}
