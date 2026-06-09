@@ -246,6 +246,7 @@ function MBox({label,value,color=D.text,sub}:{label:string;value:string;color?:s
   );
 }
 
+
 // ── Camera feed ─────────────────────────────────────────────────
 function CamFeed({name,w,h,camIndex}:{name:string;w:number;h:number;camIndex:number}){
   const [t,setT]=useState(new Date());
@@ -253,18 +254,9 @@ function CamFeed({name,w,h,camIndex}:{name:string;w:number;h:number;camIndex:num
 
   // Camera sources per project index
   const CAM_SRCS: Record<number, {src:string;title:string}> = {
-    0: {
-      src: 'https://www.youtube.com/embed/dmEq_ddk0kw?autoplay=1&mute=1&controls=0&rel=0&loop=1&playlist=dmEq_ddk0kw',
-      title: 'Site Camera 1',
-    },
-    1: {
-      src: 'https://www.youtube.com/embed/f_0KKz6pY_8?autoplay=1&mute=1&controls=0&rel=0&loop=1&playlist=f_0KKz6pY_8',
-      title: 'Site Camera 2',
-    },
-    2: {
-      src: 'https://www.youtube.com/embed/t-NAp1XIDIc?autoplay=1&mute=1&controls=0&rel=0&loop=1&playlist=t-NAp1XIDIc',
-      title: 'Site Camera 3',
-    },
+  0: { src: '/videos/cam1.mp4', title: 'Site Camera 1' },
+  1: { src: '/videos/cam2.mp4', title: 'Site Camera 2' },
+  2: { src: '/videos/cam3.mp4', title: 'Site Camera 3' },
   };
 
   const cam = CAM_SRCS[camIndex] ?? CAM_SRCS[0];
@@ -312,6 +304,8 @@ function CamFeed({name,w,h,camIndex}:{name:string;w:number;h:number;camIndex:num
     </View>
   );
 }
+
+
 // ── LEFT column dashboard ──────────────────────────────────────
 function LeftDash({p,data}:{p:Project;data:SheetData}){
   const prog=Number(p.progress_pct),cpi=Number(p.cpi),spi=Number(p.spi);
