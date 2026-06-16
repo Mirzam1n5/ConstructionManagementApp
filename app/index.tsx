@@ -1,8 +1,9 @@
 import React, { useEffect, useState, createContext, useContext } from 'react';
-import { View, Text, Platform, useWindowDimensions, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, Platform, useWindowDimensions, ScrollView, TouchableOpacity, TextInput } from 'react-native';
 import { useRouter, Stack } from 'expo-router';
 import Svg, { Path, Circle, G, Text as ST, Line, Rect, Defs, LinearGradient, Stop } from 'react-native-svg';
 import { useSheetData, SheetData, Project, Worker, BudgetRow, Milestone, EvmRow, Issue } from '../hooks/useSheetData';
+import { SHEET_ID as DEFAULT_SHEET_ID } from '../constants';
 
 // ── Theme palettes ──────────────────────────────────────────────────
 const LIGHT = {
@@ -48,6 +49,18 @@ const fmtM = (v:number) => v>=1e6?`$${(v/1e6).toFixed(1)}M`:v>=1e3?`$${(v/1e3).t
 const fmtP = (v:number) => `${Math.round(v)}%`;
 const sCol = (D:Palette,s:string) => ['On Track','Active','Resolved','Done'].includes(s)?D.green:s==='Delayed'?D.red:D.blue;
 const iCol = (D:Palette,v:number) => v>=1?D.green:D.red;
+
+
+// ── Responsive breakpoints ────────────────────────────────────────
+function useResponsive() {
+  const {width} = useWindowDimensions();
+  return {
+    isNarrow: width < 900,   // tablet / small laptop
+    isMid:    width < 1200,  // medium laptop
+    isWide:   width >= 1200, // large monitor / TV
+    colW: (cols:number, gap=14) => Math.floor((Math.min(width-48, 1352) - gap*(cols-1)) / cols),
+  };
+}
 
 // ── Card wrapper ──────────────────────────────────────────────────
 function Card({children,style}:{children:React.ReactNode;style?:any}) {
@@ -246,8 +259,8 @@ function HBar({label,v,max,color,sub}:{label:string;v:number;max:number;color:st
         <Text style={{fontSize:12,color:D.text,flex:1}} numberOfLines={1}>{label}</Text>
         <Text style={{fontSize:12,color,fontWeight:'700',marginLeft:8}}>{sub??v}</Text>
       </View>
-      <View style={{height:5,backgroundColor:D.border,borderRadius:3}}>
-        <View style={{height:5,width:`${Math.min(pct,100)}%` as any,backgroundColor:color,borderRadius:3}}/>
+      <View style={{height:7,backgroundColor:D.border,borderRadius:4}}>
+        <View style={{height:7,width:`${Math.min(pct,100)}%` as any,backgroundColor:color,borderRadius:4}}/>
       </View>
     </View>
   );
@@ -420,7 +433,7 @@ function ProjectDashboardTV({p,data,color}:{p:Project;data:SheetData;color:strin
       {/* ══ ROW 1: Gauge | CPI/SPI | Manpower | Milestones ══ */}
       <View style={{flex:5,flexDirection:'row',gap:8}}>
         {/* Gauge */}
-        <Card style={{width:160,padding:10,alignItems:'center',justifyContent:'center'}}>
+        <Card style={{flex:1.2,minWidth:130,maxWidth:200,padding:10,alignItems:'center',justifyContent:'center'}}>
           <ChartBox2>{(cw,ch)=>{
             const size=Math.min(cw,ch/0.72)*0.98;
             return(
@@ -447,51 +460,61 @@ function ProjectDashboardTV({p,data,color}:{p:Project;data:SheetData;color:strin
           </Card>
         </View>
 
-        {/* Manpower */}
+        {/* Manpower + Milestones — combined */}
         <Card style={{flex:1,padding:12,gap:8}}>
-          <SH label="Manpower" color={D.cyan}/>
-          <View style={{flex:1,flexDirection:'row',gap:14,alignItems:'center'}}>
-            <View style={{alignItems:'center',gap:4}}>
-              <Donut slices={[{v:activeW,c:D.green},{v:workers.length-activeW,c:D.muted}]} size={84} label={String(activeW)} sublabel="active"/>
-              <Text style={{fontSize:10,color:D.muted}}>of {workers.length} total</Text>
-            </View>
-            <View style={{flex:1,gap:5}}>
-              {depts.slice(0,6).map((d,i)=>(
-                <HBar key={d[0]} label={d[0]} v={d[1]} max={depts[0][1]} color={DC[i%7]} sub={String(d[1])}/>
+          <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between'}}>
+            <SH label="Manpower & Milestones" color={D.cyan}/>
+            <View style={{flexDirection:'row',gap:4}}>
+              {[{l:'Done',v:msDone,c:D.green},{l:'In Prog',v:msInP,c:D.blue},{l:'Delayed',v:msDel,c:msDel>0?D.red:D.muted}].map(item=>(
+                <View key={item.l} style={{backgroundColor:item.c+'18',borderWidth:1,borderColor:item.c+'44',
+                  paddingHorizontal:7,paddingVertical:3,borderRadius:5,alignItems:'center'}}>
+                  <Text style={{fontSize:7,color:D.muted,letterSpacing:1}}>{item.l.toUpperCase()}</Text>
+                  <Text style={{fontSize:14,fontWeight:'900',color:item.c}}>{item.v}</Text>
+                </View>
               ))}
             </View>
           </View>
-        </Card>
-
-        {/* Milestone Summary */}
-        <Card style={{width:230,padding:12,gap:8}}>
-          <SH label="Milestone Summary" color={D.accent}/>
-          <View style={{flexDirection:'row',gap:6}}>
-            {[{l:'Done',v:msDone,c:D.green},{l:'In Prog',v:msInP,c:D.blue},{l:'Delayed',v:msDel,c:msDel>0?D.red:D.muted}].map(item=>(
-              <View key={item.l} style={{flex:1,backgroundColor:item.c+'18',borderWidth:1,borderColor:item.c+'44',padding:6,alignItems:'center',borderRadius:6}}>
-                <Text style={{fontSize:8,color:D.muted,letterSpacing:1}}>{item.l.toUpperCase()}</Text>
-                <Text style={{fontSize:18,fontWeight:'900',color:item.c}}>{item.v}</Text>
+          <View style={{flex:1,flexDirection:'row',gap:12,alignItems:'center'}}>
+            {/* Donut */}
+            <View style={{alignItems:'center',gap:4}}>
+              <Donut slices={[{v:activeW,c:D.green},{v:workers.length-activeW,c:D.muted}]} size={80} label={String(activeW)} sublabel="active"/>
+              <Text style={{fontSize:9,color:D.muted}}>of {workers.length}</Text>
+            </View>
+            {/* Dept bars */}
+            <View style={{flex:1,gap:4}}>
+              {depts.slice(0,5).map((d,i)=>(
+                <HBar key={d[0]} label={d[0]} v={d[1]} max={depts[0][1]} color={DC[i%7]} sub={String(d[1])}/>
+              ))}
+            </View>
+            {/* Divider */}
+            <View style={{width:1,height:'100%' as any,backgroundColor:D.border}}/>
+            {/* Phase progress */}
+            <View style={{flex:1,gap:4}}>
+              {phases.map(phase=>{
+                const phMs=schedule.filter(m=>m.phase===phase);
+                const phDone=phMs.filter(m=>m.status==='Done').length;
+                const phPct=phMs.length>0?(phDone/phMs.length)*100:0;
+                const phCol=phPct===100?D.green:phMs.some(m=>m.status==='Delayed')?D.red:D.blue;
+                return(
+                  <View key={phase} style={{gap:2}}>
+                    <View style={{flexDirection:'row',justifyContent:'space-between'}}>
+                      <Text style={{fontSize:10,color:D.text}}>{phase}</Text>
+                      <Text style={{fontSize:10,color:phCol,fontWeight:'700'}}>{fmtP(phPct)}</Text>
+                    </View>
+                    <View style={{height:6,backgroundColor:D.bg,borderRadius:3}}>
+                      <View style={{height:6,width:`${phPct}%` as any,backgroundColor:phCol,borderRadius:3}}/>
+                    </View>
+                  </View>
+                );
+              })}
+              <View style={{backgroundColor:spi>=1?D.greenDim:D.redDim,borderWidth:1,
+                borderColor:spi>=1?D.green:D.red,padding:5,borderRadius:5,
+                flexDirection:'row',alignItems:'center',justifyContent:'space-between',marginTop:2}}>
+                <Text style={{fontSize:9,color:D.sub}}>SPI</Text>
+                <Text style={{fontSize:14,fontWeight:'900',color:iCol(D,spi)}}>{spi.toFixed(2)}</Text>
+                <Text style={{fontSize:8,color:iCol(D,spi),fontWeight:'700'}}>{spi>=1?'✓':'⚠'}</Text>
               </View>
-            ))}
-          </View>
-          <View style={{flex:1,gap:5,justifyContent:'center'}}>
-            {phases.map(phase=>{
-              const phMs=schedule.filter(m=>m.phase===phase);
-              const phDone=phMs.filter(m=>m.status==='Done').length;
-              const phPct=phMs.length>0?(phDone/phMs.length)*100:0;
-              const phCol=phPct===100?D.green:phMs.some(m=>m.status==='Delayed')?D.red:D.blue;
-              return(
-                <View key={phase} style={{gap:2}}>
-                  <View style={{flexDirection:'row',justifyContent:'space-between'}}>
-                    <Text style={{fontSize:10,color:D.text}}>{phase}</Text>
-                    <Text style={{fontSize:10,color:phCol,fontWeight:'700'}}>{fmtP(phPct)}</Text>
-                  </View>
-                  <View style={{height:4,backgroundColor:D.bg,borderRadius:2}}>
-                    <View style={{height:4,width:`${phPct}%` as any,backgroundColor:phCol,borderRadius:2}}/>
-                  </View>
-                </View>
-              );
-            })}
+            </View>
           </View>
         </Card>
       </View>
@@ -517,11 +540,9 @@ function ProjectDashboardTV({p,data,color}:{p:Project;data:SheetData;color:strin
                     <Text style={{fontSize:11,color:D.text,flex:1}} numberOfLines={1}>{c.cat}</Text>
                     <Text style={{fontSize:11,color:over?D.red:D.green,fontWeight:'700'}}>{fmtM(c.ac)}</Text>
                   </View>
-                  <View style={{height:4,backgroundColor:D.bg,borderRadius:2}}>
-                    <View style={{height:4,width:`${(c.pl/max)*100}%` as any,backgroundColor:D.blue,opacity:0.3,borderRadius:2}}/>
-                  </View>
-                  <View style={{height:4,marginTop:-4}}>
-                    <View style={{height:4,width:`${(c.ac/max)*100}%` as any,backgroundColor:over?D.red:D.green,borderRadius:2}}/>
+                  <View style={{height:8,backgroundColor:D.bg,borderRadius:4,overflow:'hidden'}}>
+                    <View style={{position:'absolute',top:0,left:0,height:8,width:`${(c.pl/max)*100}%` as any,backgroundColor:D.blue,opacity:0.25,borderRadius:4}}/>
+                    <View style={{position:'absolute',top:0,left:0,height:8,width:`${(c.ac/max)*100}%` as any,backgroundColor:over?D.red:D.green,opacity:0.85,borderRadius:4}}/>
                   </View>
                 </View>
               );
@@ -565,20 +586,8 @@ function ProjectDashboardTV({p,data,color}:{p:Project;data:SheetData;color:strin
         </>}
       </View>
 
-      {/* ══ ROW 3: Gantt | Issues ══ */}
+      {/* ══ ROW 3: Issues ══ */}
       <View style={{flex:4,flexDirection:'row',gap:8}}>
-        <Card style={{flex:3,padding:12,gap:6}}>
-          <SH label="Schedule / Gantt" color={D.accent}/>
-          <ChartBox2>{(cw,ch)=><GanttFit ms={schedule} w={cw} h={ch}/>}</ChartBox2>
-          <View style={{flexDirection:'row',gap:10}}>
-            {[{l:'Done',c:D.green},{l:'In Progress',c:D.blue},{l:'Delayed',c:D.red},{l:'Pending',c:D.muted}].map(s=>(
-              <View key={s.l} style={{flexDirection:'row',alignItems:'center',gap:4}}>
-                <View style={{width:8,height:8,backgroundColor:s.c,borderRadius:2}}/>
-                <Text style={{fontSize:10,color:D.muted}}>{s.l}</Text>
-              </View>
-            ))}
-          </View>
-        </Card>
         <Card style={{flex:2,padding:12,gap:8}}>
           <SH label="Issues" color={D.red}/>
           <View style={{flex:1,flexDirection:'row',gap:14,alignItems:'center'}}>
@@ -617,6 +626,7 @@ function ProjectDashboard({p,data,color}:{p:Project;data:SheetData;color:string}
   const {D} = useTheme();
   const PC = getPC(D);
   const DC = getDC(D);
+  const {isNarrow,isMid} = useResponsive();
 
   const workers  = data.workers.filter(w=>w.project_id===p.project_id);
   const evm      = data.evm.filter(e=>e.project_id===p.project_id);
@@ -711,16 +721,16 @@ function ProjectDashboard({p,data,color}:{p:Project;data:SheetData;color:string}
       </Card>
 
       {/* ══ ROW 2: Gauge + CPI/SPI tiles + Manpower + Milestone Summary ══ */}
-      <View style={{flexDirection:'row',gap:14}}>
+      <View style={{flexDirection:isNarrow?'column':'row',gap:14}}>
 
         {/* Gauge */}
-        <Card style={{width:190,padding:16,alignItems:'center',gap:10,justifyContent:'center'}}>
+        <Card style={{flex:1.2,minWidth:160,maxWidth:220,padding:16,alignItems:'center',gap:10,justifyContent:'center'}}>
           <ArcGauge pct={prog} color={color} size={158} label={fmtP(prog)} sublabel="complete"/>
           {p.notes&&<Text style={{fontSize:10,color:D.muted,textAlign:'center',lineHeight:15}} numberOfLines={3}>{p.notes}</Text>}
         </Card>
 
         {/* CPI / SPI */}
-        <View style={{width:160,gap:10}}>
+        <View style={{flex:1,minWidth:130,maxWidth:180,gap:10}}>
           <Card style={{flex:1,padding:14,alignItems:'center',justifyContent:'center',gap:3,backgroundColor:cpi>=1?D.greenDim:D.redDim,borderColor:cpi>=1?D.green:D.red}}>
             <Text style={{fontSize:10,color:D.sub,letterSpacing:1.5}}>COST PERF.</Text>
             <Text style={{fontSize:38,fontWeight:'900',color:iCol(D,cpi),lineHeight:40}}>{cpi.toFixed(2)}</Text>
@@ -733,10 +743,24 @@ function ProjectDashboard({p,data,color}:{p:Project;data:SheetData;color:string}
           </Card>
         </View>
 
-        {/* Manpower — NO worker names */}
-        <Card style={{flex:1,padding:16,gap:12}}>
-          <SH label="Manpower" color={D.cyan}/>
-          <View style={{flexDirection:'row',gap:16,alignItems:'flex-start'}}>
+        {/* Manpower + Milestone — combined card */}
+        <Card style={{flex:1,padding:16,gap:14}}>
+          {/* Header row */}
+          <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between'}}>
+            <SH label="Manpower & Milestones" color={D.cyan}/>
+            <View style={{flexDirection:'row',gap:6}}>
+              {[{l:'Done',v:msDone,c:D.green},{l:'In Prog',v:msInP,c:D.blue},{l:'Delayed',v:msDel,c:msDel>0?D.red:D.muted}].map(item=>(
+                <View key={item.l} style={{backgroundColor:item.c+'18',borderWidth:1,borderColor:item.c+'44',
+                  paddingHorizontal:10,paddingVertical:5,borderRadius:6,alignItems:'center',minWidth:58}}>
+                  <Text style={{fontSize:8,color:D.muted,letterSpacing:1}}>{item.l.toUpperCase()}</Text>
+                  <Text style={{fontSize:18,fontWeight:'900',color:item.c}}>{item.v}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+
+          <View style={{flexDirection:'row',gap:20}}>
+            {/* Left: Donut + counts */}
             <View style={{alignItems:'center',gap:8}}>
               <Donut slices={[{v:activeW,c:D.green},{v:workers.length-activeW,c:D.muted}]} size={96} label={String(activeW)} sublabel="active"/>
               <View style={{flexDirection:'row',gap:10}}>
@@ -751,58 +775,54 @@ function ProjectDashboard({p,data,color}:{p:Project;data:SheetData;color:string}
                 </View>
               </View>
             </View>
-            <View style={{flex:1,gap:7}}>
+
+            {/* Middle: Dept bars */}
+            <View style={{flex:1,gap:6}}>
               <Text style={{fontSize:9,color:D.muted,letterSpacing:1.5,textTransform:'uppercase',marginBottom:2}}>By Department</Text>
-              {depts.slice(0,7).map((d,i)=>(
+              {depts.slice(0,6).map((d,i)=>(
                 <HBar key={d[0]} label={d[0]} v={d[1]} max={depts[0][1]} color={DC[i%7]} sub={String(d[1])}/>
               ))}
             </View>
-          </View>
-        </Card>
 
-        {/* Milestone Summary — next to manpower */}
-        <Card style={{width:220,padding:16,gap:12}}>
-          <SH label="Milestone Summary" color={D.accent}/>
-          {/* Counts */}
-          <View style={{flexDirection:'row',gap:6}}>
-            {[{l:'Done',v:msDone,c:D.green},{l:'In Prog',v:msInP,c:D.blue},{l:'Delayed',v:msDel,c:msDel>0?D.red:D.muted}].map(item=>(
-              <View key={item.l} style={{flex:1,backgroundColor:item.c+'18',borderWidth:1,borderColor:item.c+'44',padding:8,alignItems:'center',borderRadius:6}}>
-                <Text style={{fontSize:8,color:D.muted,letterSpacing:1}}>{item.l.toUpperCase()}</Text>
-                <Text style={{fontSize:22,fontWeight:'900',color:item.c}}>{item.v}</Text>
+            {/* Divider */}
+            <View style={{width:1,backgroundColor:D.border}}/>
+
+            {/* Right: Phase progress */}
+            <View style={{flex:1,gap:6}}>
+              <Text style={{fontSize:9,color:D.muted,letterSpacing:1.5,textTransform:'uppercase',marginBottom:2}}>Phase Progress</Text>
+              {phases.map(phase=>{
+                const phMs=schedule.filter(m=>m.phase===phase);
+                const phDone=phMs.filter(m=>m.status==='Done').length;
+                const phPct=phMs.length>0?(phDone/phMs.length)*100:0;
+                const phCol=phPct===100?D.green:phMs.some(m=>m.status==='Delayed')?D.red:D.blue;
+                return(
+                  <View key={phase} style={{gap:3}}>
+                    <View style={{flexDirection:'row',justifyContent:'space-between'}}>
+                      <Text style={{fontSize:11,color:D.text}}>{phase}</Text>
+                      <Text style={{fontSize:11,color:phCol,fontWeight:'700'}}>{fmtP(phPct)}</Text>
+                    </View>
+                    <View style={{height:8,backgroundColor:D.bg,borderRadius:4}}>
+                      <View style={{height:8,width:`${phPct}%` as any,backgroundColor:phCol,borderRadius:4}}/>
+                    </View>
+                  </View>
+                );
+              })}
+              {/* SPI pill */}
+              <View style={{backgroundColor:spi>=1?D.greenDim:D.redDim,borderWidth:1,
+                borderColor:spi>=1?D.green:D.red,padding:8,borderRadius:6,
+                flexDirection:'row',alignItems:'center',justifyContent:'space-between',marginTop:4}}>
+                <Text style={{fontSize:10,color:D.sub,letterSpacing:1}}>SCHEDULE SPI</Text>
+                <Text style={{fontSize:18,fontWeight:'900',color:iCol(D,spi)}}>{spi.toFixed(2)}
+                  <Text style={{fontSize:10,fontWeight:'600'}}> {spi>=1?'✓ on track':'⚠ behind'}</Text>
+                </Text>
               </View>
-            ))}
-          </View>
-          {/* Phase bars */}
-          <View style={{gap:7}}>
-            {phases.map(phase=>{
-              const phMs=schedule.filter(m=>m.phase===phase);
-              const phDone=phMs.filter(m=>m.status==='Done').length;
-              const phPct=phMs.length>0?(phDone/phMs.length)*100:0;
-              const phCol=phPct===100?D.green:phMs.some(m=>m.status==='Delayed')?D.red:D.blue;
-              return(
-                <View key={phase} style={{gap:3}}>
-                  <View style={{flexDirection:'row',justifyContent:'space-between'}}>
-                    <Text style={{fontSize:11,color:D.text}}>{phase}</Text>
-                    <Text style={{fontSize:11,color:phCol,fontWeight:'700'}}>{fmtP(phPct)}</Text>
-                  </View>
-                  <View style={{height:5,backgroundColor:D.bg,borderRadius:3}}>
-                    <View style={{height:5,width:`${phPct}%` as any,backgroundColor:phCol,borderRadius:3}}/>
-                  </View>
-                </View>
-              );
-            })}
-          </View>
-          {/* SPI pill */}
-          <View style={{backgroundColor:spi>=1?D.greenDim:D.redDim,borderWidth:1,borderColor:spi>=1?D.green:D.red,padding:10,alignItems:'center',borderRadius:8,marginTop:'auto' as any}}>
-            <Text style={{fontSize:9,color:D.sub,letterSpacing:1.5}}>SCHEDULE SPI</Text>
-            <Text style={{fontSize:26,fontWeight:'900',color:iCol(D,spi),lineHeight:28}}>{spi.toFixed(2)}</Text>
-            <Text style={{fontSize:10,color:iCol(D,spi),fontWeight:'700'}}>{spi>=1?'ON SCHEDULE':'BEHIND'}</Text>
+            </View>
           </View>
         </Card>
       </View>
 
       {/* ══ ROW 3: Budget trend + By Category ══ */}
-      <View style={{flexDirection:'row',gap:14}}>
+      <View style={{flexDirection:isNarrow?'column':'row',gap:14}}>
         <Card style={{flex:5,padding:16,gap:10}}>
           <SH label="Budget Monthly Trend" color={D.blue}/>
           {months.length>=2
@@ -825,11 +845,9 @@ function ProjectDashboard({p,data,color}:{p:Project;data:SheetData;color:string}
                     <Text style={{fontSize:12,color:D.text,flex:1}} numberOfLines={1}>{c.cat}</Text>
                     <Text style={{fontSize:12,color:over?D.red:D.green,fontWeight:'700'}}>{fmtM(c.ac)}</Text>
                   </View>
-                  <View style={{height:4,backgroundColor:D.bg,borderRadius:2}}>
-                    <View style={{height:4,width:`${(c.pl/max)*100}%` as any,backgroundColor:D.blue,opacity:0.3,borderRadius:2}}/>
-                  </View>
-                  <View style={{height:4,marginTop:-4}}>
-                    <View style={{height:4,width:`${(c.ac/max)*100}%` as any,backgroundColor:over?D.red:D.green,borderRadius:2}}/>
+                  <View style={{height:8,backgroundColor:D.bg,borderRadius:4,overflow:'hidden'}}>
+                    <View style={{position:'absolute',top:0,left:0,height:8,width:`${(c.pl/max)*100}%` as any,backgroundColor:D.blue,opacity:0.25,borderRadius:4}}/>
+                    <View style={{position:'absolute',top:0,left:0,height:8,width:`${(c.ac/max)*100}%` as any,backgroundColor:over?D.red:D.green,opacity:0.85,borderRadius:4}}/>
                   </View>
                 </View>
               );
@@ -841,7 +859,7 @@ function ProjectDashboard({p,data,color}:{p:Project;data:SheetData;color:string}
 
       {/* ══ ROW 4: EVM S-Curve + CPI/SPI trend ══ */}
       {evm.length>=2&&(
-        <View style={{flexDirection:'row',gap:14}}>
+        <View style={{flexDirection:isMid?'column':'row',gap:14}}>
           <Card style={{flex:5,padding:16,gap:10}}>
             <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between'}}>
               <SH label="EVM S-Curve" color={color}/>
@@ -877,26 +895,10 @@ function ProjectDashboard({p,data,color}:{p:Project;data:SheetData;color:string}
         </View>
       )}
 
-      {/* ══ ROW 5: Gantt ══ */}
-      {schedule.length>0&&(
-        <Card style={{padding:16,gap:10}}>
-          <SH label="Schedule / Gantt" color={D.accent}/>
-          <ChartBox h={schedule.length*26+24}>{(cw)=><Gantt ms={schedule} w={cw} h={schedule.length*26+24}/>}</ChartBox>
-          <View style={{flexDirection:'row',gap:12}}>
-            {[{l:'Done',c:D.green},{l:'In Progress',c:D.blue},{l:'Delayed',c:D.red},{l:'Pending',c:D.muted}].map(s=>(
-              <View key={s.l} style={{flexDirection:'row',alignItems:'center',gap:4}}>
-                <View style={{width:8,height:8,backgroundColor:s.c,borderRadius:2}}/>
-                <Text style={{fontSize:10,color:D.muted}}>{s.l}</Text>
-              </View>
-            ))}
-          </View>
-        </Card>
-      )}
-
-      {/* ══ ROW 6: Issues ══ */}
+      {/* ══ ROW 5: Issues ══ */}
       {issues.length>0&&(
-        <View style={{flexDirection:'row',gap:14}}>
-          <Card style={{width:210,padding:16,gap:12}}>
+        <View style={{flexDirection:isNarrow?'column':'row',gap:14}}>
+          <Card style={{flex:1,minWidth:160,maxWidth:240,padding:16,gap:12}}>
             <SH label="Issues" color={D.red}/>
             <View style={{alignItems:'center'}}>
               <Donut slices={[
@@ -954,54 +956,235 @@ function ProjectDashboard({p,data,color}:{p:Project;data:SheetData;color:string}
 // ════════════════════════════════════════════════════════════════
 const MAX_W = 1400;
 
-function WebLayout({data}:{data:SheetData}) {
+
+// ════════════════════════════════════════════════════════════════
+// MULTI-SHEET MANAGER
+// ════════════════════════════════════════════════════════════════
+
+// Parse Sheet ID from a Google Sheets URL or raw ID
+function parseSheetId(input:string):string|null {
+  const trimmed = input.trim();
+  // Full URL: https://docs.google.com/spreadsheets/d/SHEET_ID/edit...
+  const urlMatch = trimmed.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
+  if(urlMatch) return urlMatch[1];
+  // Raw ID (alphanumeric + _ -)
+  if(/^[a-zA-Z0-9_-]{20,}$/.test(trimmed)) return trimmed;
+  return null;
+}
+
+interface SheetEntry { id: string; label: string; }
+const STORAGE_KEY = 'isker_extra_sheets';
+
+function loadExtraSheets(): SheetEntry[] {
+  if(typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
+
+function saveExtraSheets(sheets: SheetEntry[]) {
+  if(typeof window === 'undefined') return;
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(sheets)); } catch {}
+}
+
+// Single project data fetcher component
+function ProjectTab({sheetId,color,tvMode}:{sheetId:string;color:string;tvMode:boolean}) {
+  const {D} = useTheme();
+  const {data,loading,error,refresh} = useSheetData(sheetId);
+
+  if(loading) return(
+    <View style={{flex:1,alignItems:'center',justifyContent:'center',gap:10}}>
+      <Text style={{color:D.muted,fontSize:14,letterSpacing:3}}>LOADING...</Text>
+    </View>
+  );
+
+  if(error||!data) return(
+    <View style={{flex:1,alignItems:'center',justifyContent:'center',gap:14}}>
+      <Text style={{color:D.red,fontSize:14}}>⚠ Failed to load data</Text>
+      <Text style={{color:D.muted,fontSize:11,maxWidth:400,textAlign:'center'}}>{error}</Text>
+      <TouchableOpacity onPress={refresh}
+        style={{paddingHorizontal:16,paddingVertical:8,backgroundColor:D.blue,borderRadius:6}}>
+        <Text style={{color:'#fff',fontSize:13,fontWeight:'700'}}>Retry</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  const p = data.projects[0];
+  if(!p) return(
+    <View style={{flex:1,alignItems:'center',justifyContent:'center'}}>
+      <Text style={{color:D.muted,fontSize:14}}>No project found in this sheet</Text>
+    </View>
+  );
+
+  if(tvMode) return(
+    <View style={{flex:1,padding:12}}>
+      <ProjectDashboardTV p={p} data={data} color={color}/>
+    </View>
+  );
+
+  return(
+    <ScrollView style={{flex:1}} contentContainerStyle={{alignItems:'center',paddingVertical:24,paddingBottom:40}}>
+      <View style={{width:'100%' as any,maxWidth:MAX_W,paddingHorizontal:24}}>
+        <ProjectDashboard p={p} data={data} color={color}/>
+      </View>
+    </ScrollView>
+  );
+}
+
+// Add project modal
+function AddProjectModal({onAdd,onClose}:{onAdd:(entry:SheetEntry)=>void;onClose:()=>void}) {
+  const {D} = useTheme();
+  const [url,setUrl] = useState('');
+  const [label,setLabel] = useState('');
+  const [err,setErr] = useState('');
+
+  const handleAdd = () => {
+    const id = parseSheetId(url);
+    if(!id){ setErr('Invalid URL or Sheet ID'); return; }
+    if(!label.trim()){ setErr('Please enter a project name'); return; }
+    onAdd({id, label:label.trim()});
+    onClose();
+  };
+
+  return(
+    <View style={{position:'absolute',top:0,left:0,right:0,bottom:0,
+      backgroundColor:'rgba(0,0,0,0.45)',alignItems:'center',justifyContent:'center',zIndex:100} as any}>
+      <View style={{backgroundColor:D.panel,borderWidth:1,borderColor:D.border,borderRadius:12,
+        padding:28,width:480,gap:16,shadowColor:'#000',shadowOffset:{width:0,height:8},
+        shadowOpacity:0.2,shadowRadius:24,elevation:10}}>
+        <Text style={{fontSize:18,fontWeight:'900',color:D.text,letterSpacing:0.3}}>Add Project</Text>
+        <Text style={{fontSize:13,color:D.sub,lineHeight:18}}>
+          Paste a Google Sheets link or Sheet ID. Make sure the sheet is set to{' '}
+          <Text style={{color:D.blue,fontWeight:'700'}}>"Anyone with the link can view"</Text>.
+        </Text>
+        {/* Sheet URL input */}
+        <View style={{gap:6}}>
+          <Text style={{fontSize:11,color:D.muted,letterSpacing:1,textTransform:'uppercase'}}>Google Sheets URL or ID</Text>
+          <View style={{backgroundColor:D.bg,borderWidth:1,borderColor:D.border,borderRadius:8,paddingHorizontal:12,paddingVertical:10}}>
+            <TextInput
+              value={url}
+              onChangeText={t=>{setUrl(t);setErr('');}}
+              placeholder="https://docs.google.com/spreadsheets/d/..."
+              placeholderTextColor={D.muted}
+              style={{fontSize:13,color:D.text,outline:'none'} as any}
+            />
+          </View>
+        </View>
+        {/* Project name input */}
+        <View style={{gap:6}}>
+          <Text style={{fontSize:11,color:D.muted,letterSpacing:1,textTransform:'uppercase'}}>Project Name</Text>
+          <View style={{backgroundColor:D.bg,borderWidth:1,borderColor:D.border,borderRadius:8,paddingHorizontal:12,paddingVertical:10}}>
+            <TextInput
+              value={label}
+              onChangeText={t=>{setLabel(t);setErr('');}}
+              placeholder="e.g. TR - Heater Island 2"
+              placeholderTextColor={D.muted}
+              style={{fontSize:13,color:D.text,outline:'none'} as any}
+            />
+          </View>
+        </View>
+        {err&&<Text style={{fontSize:12,color:D.red,fontWeight:'600'}}>{err}</Text>}
+        <View style={{flexDirection:'row',gap:10,marginTop:4}}>
+          <TouchableOpacity onPress={onClose}
+            style={{flex:1,paddingVertical:11,borderRadius:8,borderWidth:1,borderColor:D.border,alignItems:'center'}}>
+            <Text style={{fontSize:13,color:D.sub,fontWeight:'700'}}>Cancel</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={handleAdd}
+            style={{flex:1,paddingVertical:11,borderRadius:8,backgroundColor:D.blue,alignItems:'center'}}>
+            <Text style={{fontSize:13,color:'#fff',fontWeight:'800'}}>Add Project</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+function WebLayout({data,defaultSheetId}:{data:SheetData;defaultSheetId:string}) {
   const {D,isDark,toggleTheme} = useTheme();
   const PC = getPC(D);
   const [activeIdx,setActiveIdx]=useState(0);
   const [tvMode,setTvMode]=useState(false);
-  const projects=data.projects;
-  const p=projects[activeIdx];
-  const color=PC[activeIdx%3];
+  const [showAdd,setShowAdd]=useState(false);
+  const [extraSheets,setExtraSheets]=useState<SheetEntry[]>(()=>loadExtraSheets());
+
+  // First tab = default sheet (from constants), rest = extra sheets
+  const defaultLabel = data.projects[0]?.project_name ?? 'Project 1';
+  const allTabs = [
+    {id:defaultSheetId, label:defaultLabel, isDefault:true},
+    ...extraSheets.map(e=>({...e, isDefault:false})),
+  ];
+
+  const handleAddSheet = (entry:SheetEntry) => {
+    const updated = [...extraSheets, entry];
+    setExtraSheets(updated);
+    saveExtraSheets(updated);
+    setActiveIdx(allTabs.length); // switch to new tab
+  };
+
+  const handleRemoveSheet = (idx:number) => {
+    const updated = extraSheets.filter((_,i)=>i!==idx-1);
+    setExtraSheets(updated);
+    saveExtraSheets(updated);
+    if(activeIdx>=allTabs.length-1) setActiveIdx(allTabs.length-2);
+  };
+
+  const activeTab = allTabs[activeIdx] ?? allTabs[0];
+  const color = PC[activeIdx%3];
 
   return(
     <View style={{flex:1,backgroundColor:D.bg}}>
       <Stack.Screen options={{headerShown:false}}/>
 
-      {/* Project tabs — centred */}
+      {/* Tab bar */}
       <View style={{backgroundColor:D.panel,borderBottomWidth:1,borderBottomColor:D.border,alignItems:'center',
         shadowColor:'rgba(0,0,0,0.05)',shadowOffset:{width:0,height:2},shadowOpacity:1,shadowRadius:4,elevation:2}}>
         <View style={{flexDirection:'row',alignItems:'center',maxWidth:tvMode?undefined:MAX_W,width:'100%' as any,paddingHorizontal:24}}>
-          <View style={{flex:1,flexDirection:'row',justifyContent:'center'}}>
-            {projects.map((proj,i)=>{
+
+          {/* Project tabs */}
+          <View style={{flex:1,flexDirection:'row',alignItems:'center'}}>
+            {allTabs.map((tab,i)=>{
               const on=i===activeIdx;
               const col=PC[i%3];
               return(
-                <TouchableOpacity key={proj.project_id} onPress={()=>setActiveIdx(i)}
-                  style={{paddingHorizontal:tvMode?18:28,paddingVertical:tvMode?9:15,borderBottomWidth:3,
-                    borderBottomColor:on?col:'transparent',marginBottom:-1,
-                    flexDirection:'row',alignItems:'center',gap:8}}>
-                  <View style={{width:8,height:8,borderRadius:4,backgroundColor:on?col:D.muted}}/>
-                  <Text style={{fontSize:tvMode?12:14,fontWeight:'800',letterSpacing:0.3,color:on?D.text:D.sub}}>{proj.project_name}</Text>
-                  <View style={{paddingHorizontal:7,paddingVertical:2,backgroundColor:sCol(D,proj.status)+'18',
-                    borderWidth:1,borderColor:sCol(D,proj.status)+'66',borderRadius:4}}>
-                    <Text style={{fontSize:9,color:sCol(D,proj.status),fontWeight:'800',letterSpacing:0.8}}>{proj.status.toUpperCase()}</Text>
-                  </View>
-                </TouchableOpacity>
+                <View key={tab.id+i} style={{flexDirection:'row',alignItems:'center'}}>
+                  <TouchableOpacity onPress={()=>setActiveIdx(i)}
+                    style={{paddingHorizontal:tvMode?14:20,paddingVertical:tvMode?9:14,borderBottomWidth:3,
+                      borderBottomColor:on?col:'transparent',marginBottom:-1,
+                      flexDirection:'row',alignItems:'center',gap:7}}>
+                    <View style={{width:7,height:7,borderRadius:3.5,backgroundColor:on?col:D.muted}}/>
+                    <Text style={{fontSize:tvMode?12:13,fontWeight:'800',letterSpacing:0.3,color:on?D.text:D.sub}}>{tab.label}</Text>
+                  </TouchableOpacity>
+                  {/* Remove button for extra sheets */}
+                  {!tab.isDefault&&on&&(
+                    <TouchableOpacity onPress={()=>handleRemoveSheet(i)}
+                      style={{width:18,height:18,borderRadius:9,backgroundColor:D.redDim,
+                        borderWidth:1,borderColor:D.red,alignItems:'center',justifyContent:'center',marginLeft:-4}}>
+                      <Text style={{fontSize:11,color:D.red,fontWeight:'900',lineHeight:13}}>×</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
               );
             })}
+
+            {/* + Add project button */}
+            <TouchableOpacity onPress={()=>setShowAdd(true)}
+              style={{paddingHorizontal:12,paddingVertical:8,marginLeft:4,
+                flexDirection:'row',alignItems:'center',gap:5,
+                borderRadius:6,borderWidth:1,borderColor:D.border,backgroundColor:D.bg,marginBottom:4}}>
+              <Text style={{fontSize:16,color:D.accent,fontWeight:'800',lineHeight:18}}>+</Text>
+              <Text style={{fontSize:11,color:D.accent,fontWeight:'700',letterSpacing:0.5}}>Add Sheet</Text>
+            </TouchableOpacity>
           </View>
+
           {/* Theme + TV toggles */}
           <View style={{flexDirection:'row',alignItems:'center',gap:8}}>
-            {/* Theme toggle */}
             <TouchableOpacity onPress={toggleTheme}
               style={{flexDirection:'row',alignItems:'center',gap:6,paddingHorizontal:12,paddingVertical:6,
                 borderRadius:6,borderWidth:1,borderColor:D.border,backgroundColor:D.bg}}>
               <Text style={{fontSize:14}}>{isDark?'☀️':'🌙'}</Text>
-              <Text style={{fontSize:10,fontWeight:'800',letterSpacing:1,color:D.muted}}>
-                {isDark?'LIGHT':'DARK'}
-              </Text>
+              <Text style={{fontSize:10,fontWeight:'800',letterSpacing:1,color:D.muted}}>{isDark?'LIGHT':'DARK'}</Text>
             </TouchableOpacity>
-            {/* TV mode toggle */}
             <TouchableOpacity onPress={()=>setTvMode(v=>!v)}
               style={{flexDirection:'row',alignItems:'center',gap:6,paddingHorizontal:12,paddingVertical:6,
                 borderRadius:6,borderWidth:1,borderColor:tvMode?D.accent:D.border,
@@ -1015,18 +1198,27 @@ function WebLayout({data}:{data:SheetData}) {
         </View>
       </View>
 
-      {/* Dashboard */}
-      {tvMode ? (
-        <View style={{flex:1,padding:12}}>
-          {p?<ProjectDashboardTV p={p} data={data} color={color}/>:null}
-        </View>
-      ) : (
-        <ScrollView style={{flex:1}} contentContainerStyle={{alignItems:'center',paddingVertical:24,paddingBottom:40}}>
-          <View style={{width:'100%' as any,maxWidth:MAX_W,paddingHorizontal:24}}>
-            {p?<ProjectDashboard p={p} data={data} color={color}/>:null}
+      {/* Dashboard content */}
+      {activeIdx===0 ? (
+        // Default sheet — already loaded
+        tvMode ? (
+          <View style={{flex:1,padding:12}}>
+            {data.projects[0]?<ProjectDashboardTV p={data.projects[0]} data={data} color={color}/>:null}
           </View>
-        </ScrollView>
+        ) : (
+          <ScrollView style={{flex:1}} contentContainerStyle={{alignItems:'center',paddingVertical:24,paddingBottom:40}}>
+            <View style={{width:'100%' as any,maxWidth:MAX_W,paddingHorizontal:24}}>
+              {data.projects[0]?<ProjectDashboard p={data.projects[0]} data={data} color={color}/>:null}
+            </View>
+          </ScrollView>
+        )
+      ) : (
+        // Extra sheets — each loads its own data
+        <ProjectTab sheetId={activeTab.id} color={color} tvMode={tvMode}/>
       )}
+
+      {/* Add sheet modal */}
+      {showAdd&&<AddProjectModal onAdd={handleAddSheet} onClose={()=>setShowAdd(false)}/>}
     </View>
   );
 }
@@ -1123,5 +1315,5 @@ function HomeScreenInner() {
     </View>
   );
 
-  return isWeb?<WebLayout data={data}/>:<MobileHome data={data}/>;
+  return isWeb?<WebLayout data={data} defaultSheetId={DEFAULT_SHEET_ID}/>:<MobileHome data={data}/>;
 }
