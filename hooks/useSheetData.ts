@@ -122,13 +122,13 @@ export interface SheetData {
 }
 
 // ─── Fetch helpers ───────────────────────────────────────────────
-function sheetUrl(sheetName: string): string {
+function sheetUrl(sheetName: string, sheetId: string): string {
   const encoded = encodeURIComponent(sheetName);
-  return `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encoded}`;
+  return `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&sheet=${encoded}`;
 }
 
-async function fetchSheet<T>(sheetName: string): Promise<T[]> {
-  const url = sheetUrl(sheetName);
+async function fetchSheet<T>(sheetName: string, sheetId: string): Promise<T[]> {
+  const url = sheetUrl(sheetName, sheetId);
   const res = await fetch(url);
   const text = await res.text();
   // Google wraps response in /*O_o*/\ngoogle.visualization.Query.setResponse({...});
@@ -148,10 +148,12 @@ async function fetchSheet<T>(sheetName: string): Promise<T[]> {
 }
 
 // ─── Main hook ───────────────────────────────────────────────────
-export function useSheetData() {
+export function useSheetData(overrideSheetId?: string) {
   const [data, setData] = useState<SheetData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const sheetId = overrideSheetId ?? SHEET_ID;
 
   const load = useCallback(async () => {
     try {
@@ -159,14 +161,14 @@ export function useSheetData() {
       setError(null);
       const [projects, workers, equipment, budget, schedule, evm, issues, dailyReports] =
         await Promise.all([
-          fetchSheet<Project>('Projects'),
-          fetchSheet<Worker>('Workers'),
-          fetchSheet<Equipment>('Equipment'),
-          fetchSheet<BudgetRow>('Budget'),
-          fetchSheet<Milestone>('Schedule'),
-          fetchSheet<EvmRow>('EVM'),
-          fetchSheet<Issue>('Issues'),
-          fetchSheet<DailyReport>('Daily Reports'),
+          fetchSheet<Project>('Projects', sheetId),
+          fetchSheet<Worker>('Workers', sheetId),
+          fetchSheet<Equipment>('Equipment', sheetId),
+          fetchSheet<BudgetRow>('Budget', sheetId),
+          fetchSheet<Milestone>('Schedule', sheetId),
+          fetchSheet<EvmRow>('EVM', sheetId),
+          fetchSheet<Issue>('Issues', sheetId),
+          fetchSheet<DailyReport>('Daily Reports', sheetId),
         ]);
       setData({ projects, workers, equipment, budget, schedule, evm, issues, dailyReports });
     } catch (e: any) {
@@ -174,7 +176,7 @@ export function useSheetData() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [sheetId]);
 
   useEffect(() => { load(); }, [load]);
 
