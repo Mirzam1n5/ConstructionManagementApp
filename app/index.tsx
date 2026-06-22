@@ -1212,20 +1212,14 @@ function AddProjectModal({onAdd,onClose}:{onAdd:(entry:SheetEntry)=>void;onClose
   );
 }
 
-function WebLayout({data,defaultSheetId}:{data:SheetData;defaultSheetId:string}) {
+function WebLayout({sheets,setSheets}:{sheets:SheetEntry[];setSheets:(s:SheetEntry[]|((_:SheetEntry[])=>SheetEntry[]))=>void}) {
   const {D,isDark,toggleTheme} = useTheme();
   const PC = getPC(D);
   const [activeIdx,setActiveIdx]=useState(0);
   const [tvMode,setTvMode]=useState(false);
   const [showAdd,setShowAdd]=useState(false);
-  const {extraSheets,setExtraSheets} = useExtraSheets();
 
-  // First tab = default sheet (from constants), rest = extra sheets
-  const defaultLabel = data.projects[0]?.project_name ?? 'Project 1';
-  const allTabs = [
-    {id:defaultSheetId, label:defaultLabel, isDefault:true},
-    ...extraSheets.map(e=>({...e, isDefault:false})),
-  ];
+  const allTabs = sheets.map(e=>({...e,isDefault:false}));
 
   const handleAddSheet = async (entry:SheetEntry) => {
     try {
@@ -1235,10 +1229,9 @@ function WebLayout({data,defaultSheetId}:{data:SheetData;defaultSheetId:string})
         body: JSON.stringify(entry),
       });
       if (res.ok) {
-        // Refresh from server to get latest list
         const updated = await fetch('/api/sheets').then(r => r.json());
-        setExtraSheets(_ => updated);
-        setActiveIdx(1 + updated.length - 1); // switch to new tab
+        setSheets(updated);
+        setActiveIdx(updated.length - 1);
       }
     } catch (e) {
       console.error('Failed to add sheet:', e);
@@ -1251,10 +1244,9 @@ function WebLayout({data,defaultSheetId}:{data:SheetData;defaultSheetId:string})
     try {
       const res = await fetch(`/api/sheets/${sheetId}`, { method: 'DELETE' });
       if (res.ok) {
-        // Refresh from server
         const updated = await fetch('/api/sheets').then(r => r.json());
-        setExtraSheets(_ => updated);
-        if(activeIdx>=allTabs.length-1) setActiveIdx(Math.max(0, allTabs.length-2));
+        setSheets(updated);
+        if(activeIdx>=updated.length) setActiveIdx(Math.max(0, updated.length-1));
       }
     } catch (e) {
       console.error('Failed to remove sheet:', e);
@@ -1330,24 +1322,8 @@ function WebLayout({data,defaultSheetId}:{data:SheetData;defaultSheetId:string})
         </View>
       </View>
 
-      {/* Dashboard content */}
-      {activeIdx===0 ? (
-        // Default sheet — already loaded
-        tvMode ? (
-          <View style={{flex:1,padding:12}}>
-            {data.projects[0]?<ProjectDashboardTV p={data.projects[0]} data={data} color={color}/>:null}
-          </View>
-        ) : (
-          <ScrollView style={{flex:1}} contentContainerStyle={{alignItems:'center',paddingVertical:24,paddingBottom:40}}>
-            <View style={{width:'100%' as any,maxWidth:MAX_W,paddingHorizontal:24}}>
-              {data.projects[0]?<ProjectDashboard p={data.projects[0]} data={data} color={color}/>:null}
-            </View>
-          </ScrollView>
-        )
-      ) : (
-        // Extra sheets — each loads its own data
-        <ProjectTab sheetId={activeTab.id} color={color} tvMode={tvMode}/>
-      )}
+      {/* Dashboard content — all tabs load via ProjectTab */}
+      {activeTab && <ProjectTab sheetId={activeTab.id} color={color} tvMode={tvMode}/>}
 
       {/* Add sheet modal */}
       {showAdd&&<AddProjectModal onAdd={handleAddSheet} onClose={()=>setShowAdd(false)}/>}
@@ -1361,17 +1337,15 @@ function WebLayout({data,defaultSheetId}:{data:SheetData;defaultSheetId:string})
 // Shows the default sheet's projects PLUS a horizontal sheet-picker for
 // any extra Google Sheets the user added on web — so mobile and web
 // always reflect the same connected sheets (shared AsyncStorage state).
-function MobileHome({data:defaultData, defaultSheetId}:{data:SheetData; defaultSheetId:string}) {
+function MobileHome({sheets,setSheets}:{sheets:SheetEntry[];setSheets:(s:SheetEntry[]|((_:SheetEntry[])=>SheetEntry[]))=>void}) {
   const {D,isDark,toggleTheme} = useTheme();
   const PC = getPC(D);
   const router=useRouter();
-  const {extraSheets,setExtraSheets,loaded} = useExtraSheets();
   const [activeIdx,setActiveIdx]=useState(0);
   const [showAdd,setShowAdd]=useState(false);
 
-  const allTabs = [{id:defaultSheetId,label:'Main'}, ...extraSheets];
+  const allTabs = sheets;
   const activeSheet = allTabs[activeIdx] ?? allTabs[0];
-  const isDefaultTab = activeIdx===0;
 
   const handleAddSheet = async (entry:SheetEntry) => {
     try {
@@ -1381,23 +1355,16 @@ function MobileHome({data:defaultData, defaultSheetId}:{data:SheetData; defaultS
         body: JSON.stringify(entry),
       });
       if (res.ok) {
-        // Refresh from server to get latest list
         const updated = await fetch('/api/sheets').then(r => r.json());
-        setExtraSheets(_ => updated);
-        setActiveIdx(1 + updated.length - 1); // switch to new tab
+        setSheets(updated);
+        setActiveIdx(updated.length - 1);
       }
     } catch (e) {
       console.error('Failed to add sheet:', e);
     }
   };
 
-  // Only fetch a second sheet when an extra tab is actually selected.
-  const { data: extraData, loading: extraLoading, error: extraError } =
-    useSheetData(isDefaultTab ? undefined : activeSheet.id);
-
-  const data = isDefaultTab ? defaultData : extraData;
-  const tabLoading = !isDefaultTab && extraLoading;
-  const tabError = !isDefaultTab && extraError;
+  const {data,loading,error,refresh} = useSheetData(activeSheet?.id);
 
   return(
     <View style={{flex:1,backgroundColor:D.bg}}>
@@ -1420,9 +1387,8 @@ function MobileHome({data:defaultData, defaultSheetId}:{data:SheetData; defaultS
 
       {showAdd && <AddProjectModal onAdd={handleAddSheet} onClose={()=>setShowAdd(false)}/>}
 
-
-      {/* Sheet tabs — only shown when there's more than one connected sheet */}
-      {loaded && allTabs.length>1 && (
+      {/* Sheet tabs */}
+      {allTabs.length>1 && (
         <ScrollView horizontal showsHorizontalScrollIndicator={false}
           style={{maxHeight:46,borderBottomWidth:1,borderBottomColor:D.border,backgroundColor:D.panel}}
           contentContainerStyle={{paddingHorizontal:10,gap:6,alignItems:'center'}}>
@@ -1440,19 +1406,22 @@ function MobileHome({data:defaultData, defaultSheetId}:{data:SheetData; defaultS
         </ScrollView>
       )}
 
-      {tabLoading && (
+      {loading && (
         <View style={{flex:1,alignItems:'center',justifyContent:'center'}}>
           <Text style={{color:D.muted,fontSize:14,letterSpacing:2}}>LOADING SHEET...</Text>
         </View>
       )}
 
-      {tabError && (
+      {!loading && error && (
         <View style={{flex:1,alignItems:'center',justifyContent:'center',gap:10,padding:20}}>
-          <Text style={{color:D.red,fontSize:14,textAlign:'center'}}>⚠ {tabError}</Text>
+          <Text style={{color:D.red,fontSize:14,textAlign:'center'}}>⚠ {error}</Text>
+          <TouchableOpacity onPress={refresh} style={{paddingHorizontal:16,paddingVertical:8,backgroundColor:D.blue,borderRadius:6}}>
+            <Text style={{color:'#fff',fontSize:13,fontWeight:'700'}}>Retry</Text>
+          </TouchableOpacity>
         </View>
       )}
 
-      {!tabLoading && !tabError && data && (
+      {!loading && !error && data && (
         <ScrollView style={{flex:1}} contentContainerStyle={{padding:14,gap:12}}>
           {data.projects.map((p,i)=>{
             const prog=num(p.progress_pct),cpi=num(p.cpi),spi=num(p.spi);
@@ -1510,11 +1479,12 @@ export default function HomeScreen() {
 
 function HomeScreenInner() {
   const {D}=useTheme();
-  const {data,loading,error,refresh}=useSheetData();
   const {width}=useWindowDimensions();
   const isWeb=Platform.OS==='web'&&width>=768;
+  const {extraSheets,setExtraSheets,loaded}=useExtraSheets();
+  const [showAdd,setShowAdd]=useState(false);
 
-  if(loading)return(
+  if(!loaded)return(
     <View style={{flex:1,backgroundColor:D.bg,alignItems:'center',justifyContent:'center',gap:12}}>
       <Stack.Screen options={{headerShown:false}}/>
       <View style={{width:40,height:40,borderRadius:20,backgroundColor:D.blue,opacity:0.15}}/>
@@ -1522,16 +1492,31 @@ function HomeScreenInner() {
     </View>
   );
 
-  if(error||!data)return(
-    <View style={{flex:1,backgroundColor:D.bg,alignItems:'center',justifyContent:'center',gap:16}}>
+  if(extraSheets.length===0)return(
+    <View style={{flex:1,backgroundColor:D.bg,alignItems:'center',justifyContent:'center',gap:20}}>
       <Stack.Screen options={{headerShown:false}}/>
-      <Text style={{color:D.red,fontSize:16,fontWeight:'600'}}>⚠ {error??'No data'}</Text>
-      <TouchableOpacity onPress={refresh}
-        style={{paddingHorizontal:20,paddingVertical:12,backgroundColor:D.blue,borderRadius:8}}>
-        <Text style={{color:'#fff',fontSize:14,fontWeight:'700'}}>Retry</Text>
+      <Text style={{color:D.text,fontSize:24,fontWeight:'900',letterSpacing:3}}>ISKER</Text>
+      <Text style={{color:D.muted,fontSize:14,textAlign:'center',maxWidth:300,lineHeight:22}}>
+        Add a Google Sheet to get started
+      </Text>
+      <TouchableOpacity onPress={()=>setShowAdd(true)}
+        style={{paddingHorizontal:24,paddingVertical:13,backgroundColor:D.blue,borderRadius:8,
+          flexDirection:'row',alignItems:'center',gap:8}}>
+        <Text style={{color:'#fff',fontSize:14,fontWeight:'800'}}>+ Add Project</Text>
       </TouchableOpacity>
+      {showAdd&&(
+        <AddProjectModal
+          onAdd={async(entry)=>{
+            await fetch('/api/sheets',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(entry)});
+            const updated=await fetch('/api/sheets').then(r=>r.json());
+            setExtraSheets(updated);
+            setShowAdd(false);
+          }}
+          onClose={()=>setShowAdd(false)}
+        />
+      )}
     </View>
   );
 
-  return isWeb?<WebLayout data={data} defaultSheetId={DEFAULT_SHEET_ID}/>:<MobileHome data={data} defaultSheetId={DEFAULT_SHEET_ID}/>;
+  return isWeb?<WebLayout sheets={extraSheets} setSheets={setExtraSheets}/>:<MobileHome sheets={extraSheets} setSheets={setExtraSheets}/>;
 }
