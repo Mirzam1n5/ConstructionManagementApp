@@ -5,7 +5,6 @@ import { Ionicons } from '@expo/vector-icons';
 import Svg, { Path, Circle, G, Text as ST, Line, Rect, Defs, LinearGradient, Stop } from 'react-native-svg';
 import { useSheetData, SheetData, Project, Worker, BudgetRow, Milestone, EvmRow, Issue } from '../hooks/useSheetData';
 import { getJSON, setJSON } from '../hooks/useStorage';
-import { SHEET_ID as DEFAULT_SHEET_ID } from '../constants';
 
 // ── Theme palettes ──────────────────────────────────────────────────
 const LIGHT = {
@@ -965,6 +964,36 @@ function ProjectTab({sheetId,color,tvMode}:{sheetId:string;color:string;tvMode:b
   );
 }
 
+// Confirm delete modal
+function ConfirmDeleteModal({label,onConfirm,onClose}:{label:string;onConfirm:()=>void;onClose:()=>void}) {
+  const {D} = useTheme();
+  return(
+    <View style={{position:'absolute',top:0,left:0,right:0,bottom:0,
+      backgroundColor:'rgba(0,0,0,0.45)',alignItems:'center',justifyContent:'center',zIndex:101} as any}>
+      <View style={{backgroundColor:D.panel,borderWidth:1,borderColor:D.border,borderRadius:12,
+        padding:26,width:400,gap:14,shadowColor:'#000',shadowOffset:{width:0,height:8},
+        shadowOpacity:0.2,shadowRadius:24,elevation:10}}>
+        <Text style={{fontSize:17,fontWeight:'900',color:D.text}}>Delete project?</Text>
+        <Text style={{fontSize:13,color:D.sub,lineHeight:19}}>
+          Are you sure you want to remove{' '}
+          <Text style={{color:D.text,fontWeight:'700'}}>"{label}"</Text>
+          {' '}from the dashboard? This only removes it from this view — the Google Sheet itself will not be affected.
+        </Text>
+        <View style={{flexDirection:'row',gap:10,marginTop:4}}>
+          <TouchableOpacity onPress={onClose}
+            style={{flex:1,paddingVertical:11,borderRadius:8,borderWidth:1,borderColor:D.border,alignItems:'center'}}>
+            <Text style={{fontSize:13,color:D.sub,fontWeight:'700'}}>Cancel</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={onConfirm}
+            style={{flex:1,paddingVertical:11,borderRadius:8,backgroundColor:D.red,alignItems:'center'}}>
+            <Text style={{fontSize:13,color:'#fff',fontWeight:'800'}}>Delete</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </View>
+  );
+}
+
 // Add project modal
 function AddProjectModal({onAdd,onClose}:{onAdd:(entry:SheetEntry)=>void;onClose:()=>void}) {
   const {D} = useTheme();
@@ -1033,33 +1062,43 @@ function AddProjectModal({onAdd,onClose}:{onAdd:(entry:SheetEntry)=>void;onClose
   );
 }
 
-function WebLayout({data,defaultSheetId}:{data:SheetData;defaultSheetId:string}) {
+function WebLayout() {
   const {D,isDark,toggleTheme} = useTheme();
   const PC = getPC(D);
   const [activeIdx,setActiveIdx]=useState(0);
   const [tvMode,setTvMode]=useState(false);
   const [showAdd,setShowAdd]=useState(false);
-  const {extraSheets,setExtraSheets} = useExtraSheets();
+  const [pendingDelete,setPendingDelete]=useState<number|null>(null);
+  const {extraSheets,setExtraSheets,loaded} = useExtraSheets();
 
-  // First tab = default sheet (from constants), rest = extra sheets
-  const defaultLabel = data.projects[0]?.project_name ?? 'Project 1';
-  const allTabs = [
-    {id:defaultSheetId, label:defaultLabel, isDefault:true},
-    ...extraSheets.map(e=>({...e, isDefault:false})),
-  ];
+  // Every project the user sees comes purely from their saved sheet
+  // list (AsyncStorage). No sheet ID is baked into the source code —
+  // the dashboard starts empty until the user adds a project.
+  const allTabs = extraSheets;
 
   const handleAddSheet = (entry:SheetEntry) => {
     setExtraSheets(prev => [...prev, entry]);
-    setActiveIdx(allTabs.length); // switch to new tab
+    setActiveIdx(allTabs.length);
   };
 
-  const handleRemoveSheet = (idx:number) => {
-    setExtraSheets(prev => prev.filter((_,i)=>i!==idx-1));
-    if(activeIdx>=allTabs.length-1) setActiveIdx(allTabs.length-2);
+  const requestRemoveSheet = (idx:number) => setPendingDelete(idx);
+
+  const confirmRemoveSheet = () => {
+    if(pendingDelete==null) return;
+    const idx = pendingDelete;
+    setExtraSheets(prev => prev.filter((_,i)=>i!==idx));
+    if(activeIdx>=idx) setActiveIdx(Math.max(0,activeIdx-1));
+    setPendingDelete(null);
   };
 
-  const activeTab = allTabs[activeIdx] ?? allTabs[0];
+  const activeTab = allTabs[activeIdx];
   const color = PC[activeIdx%3];
+
+  if(!loaded) return(
+    <View style={{flex:1,backgroundColor:D.bg,alignItems:'center',justifyContent:'center'}}>
+      <Text style={{color:D.muted,fontSize:13,letterSpacing:2}}>LOADING...</Text>
+    </View>
+  );
 
   return(
     <View style={{flex:1,backgroundColor:D.bg}}>
@@ -1084,9 +1123,9 @@ function WebLayout({data,defaultSheetId}:{data:SheetData;defaultSheetId:string})
                     <View style={{width:7,height:7,borderRadius:3.5,backgroundColor:on?col:D.muted}}/>
                     <Text style={{fontSize:tvMode?12:13,fontWeight:'800',letterSpacing:0.3,color:on?D.text:D.sub}}>{tab.label}</Text>
                   </TouchableOpacity>
-                  {/* Remove button for extra sheets */}
-                  {!tab.isDefault&&on&&(
-                    <TouchableOpacity onPress={()=>handleRemoveSheet(i)}
+                  {/* Remove button — every tab is removable now */}
+                  {on&&(
+                    <TouchableOpacity onPress={()=>requestRemoveSheet(i)}
                       style={{width:18,height:18,borderRadius:9,backgroundColor:D.redDim,
                         borderWidth:1,borderColor:D.red,alignItems:'center',justifyContent:'center',marginLeft:-4}}>
                       <Text style={{fontSize:11,color:D.red,fontWeight:'900',lineHeight:13}}>×</Text>
@@ -1128,26 +1167,29 @@ function WebLayout({data,defaultSheetId}:{data:SheetData;defaultSheetId:string})
       </View>
 
       {/* Dashboard content */}
-      {activeIdx===0 ? (
-        // Default sheet — already loaded
-        tvMode ? (
-          <View style={{flex:1,padding:12}}>
-            {data.projects[0]?<ProjectDashboardTV p={data.projects[0]} data={data} color={color}/>:null}
-          </View>
-        ) : (
-          <ScrollView style={{flex:1}} contentContainerStyle={{alignItems:'center',paddingVertical:24,paddingBottom:40}}>
-            <View style={{width:'100%' as any,maxWidth:MAX_W,paddingHorizontal:24}}>
-              {data.projects[0]?<ProjectDashboard p={data.projects[0]} data={data} color={color}/>:null}
-            </View>
-          </ScrollView>
-        )
-      ) : (
-        // Extra sheets — each loads its own data
+      {allTabs.length===0 ? (
+        <View style={{flex:1,alignItems:'center',justifyContent:'center',gap:14}}>
+          <Text style={{color:D.muted,fontSize:14}}>No projects yet.</Text>
+          <TouchableOpacity onPress={()=>setShowAdd(true)}
+            style={{paddingHorizontal:16,paddingVertical:10,backgroundColor:D.blue,borderRadius:8}}>
+            <Text style={{color:'#fff',fontSize:13,fontWeight:'800'}}>+ Add your first project</Text>
+          </TouchableOpacity>
+        </View>
+      ) : activeTab ? (
         <ProjectTab sheetId={activeTab.id} color={color} tvMode={tvMode}/>
-      )}
+      ) : null}
 
       {/* Add sheet modal */}
       {showAdd&&<AddProjectModal onAdd={handleAddSheet} onClose={()=>setShowAdd(false)}/>}
+
+      {/* Confirm delete modal */}
+      {pendingDelete!=null&&(
+        <ConfirmDeleteModal
+          label={allTabs[pendingDelete]?.label ?? 'this project'}
+          onConfirm={confirmRemoveSheet}
+          onClose={()=>setPendingDelete(null)}
+        />
+      )}
     </View>
   );
 }
@@ -1158,30 +1200,39 @@ function WebLayout({data,defaultSheetId}:{data:SheetData;defaultSheetId:string})
 // Shows the default sheet's projects PLUS a horizontal sheet-picker for
 // any extra Google Sheets the user added on web — so mobile and web
 // always reflect the same connected sheets (shared AsyncStorage state).
-function MobileHome({data:defaultData, defaultSheetId}:{data:SheetData; defaultSheetId:string}) {
+function MobileHome() {
   const {D,isDark,toggleTheme} = useTheme();
   const PC = getPC(D);
   const router=useRouter();
   const {extraSheets,setExtraSheets,loaded} = useExtraSheets();
   const [activeIdx,setActiveIdx]=useState(0);
   const [showAdd,setShowAdd]=useState(false);
+  const [pendingDelete,setPendingDelete]=useState<number|null>(null);
 
-  const allTabs = [{id:defaultSheetId,label:'Main'}, ...extraSheets];
-  const activeSheet = allTabs[activeIdx] ?? allTabs[0];
-  const isDefaultTab = activeIdx===0;
+  // Everything lives in AsyncStorage — no sheet ID baked into source code.
+  const allTabs = extraSheets;
+  const activeSheet = allTabs[activeIdx];
 
   const handleAddSheet = (entry:SheetEntry) => {
     setExtraSheets(prev => [...prev, entry]);
-    setActiveIdx(allTabs.length); // switch to the newly added tab
+    setActiveIdx(allTabs.length);
   };
 
-  // Only fetch a second sheet when an extra tab is actually selected.
-  const { data: extraData, loading: extraLoading, error: extraError } =
-    useSheetData(isDefaultTab ? undefined : activeSheet.id);
+  const requestRemoveSheet = (idx:number) => setPendingDelete(idx);
+  const confirmRemoveSheet = () => {
+    if(pendingDelete==null) return;
+    const idx = pendingDelete;
+    setExtraSheets(prev => prev.filter((_,i)=>i!==idx));
+    if(activeIdx>=idx) setActiveIdx(Math.max(0,activeIdx-1));
+    setPendingDelete(null);
+  };
 
-  const data = isDefaultTab ? defaultData : extraData;
-  const tabLoading = !isDefaultTab && extraLoading;
-  const tabError = !isDefaultTab && extraError;
+  const { data: tabData, loading: tabLoadingRaw, error: tabErrorRaw } =
+    useSheetData(activeSheet?.id);
+
+  const data = tabData;
+  const tabLoading = !!activeSheet && tabLoadingRaw;
+  const tabError = !!activeSheet && tabErrorRaw;
 
   return(
     <View style={{flex:1,backgroundColor:D.bg}}>
@@ -1204,6 +1255,13 @@ function MobileHome({data:defaultData, defaultSheetId}:{data:SheetData; defaultS
 
       {showAdd && <AddProjectModal onAdd={handleAddSheet} onClose={()=>setShowAdd(false)}/>}
 
+      {pendingDelete!=null&&(
+        <ConfirmDeleteModal
+          label={allTabs[pendingDelete]?.label ?? 'this project'}
+          onConfirm={confirmRemoveSheet}
+          onClose={()=>setPendingDelete(null)}
+        />
+      )}
 
       {/* Sheet tabs — only shown when there's more than one connected sheet */}
       {loaded && allTabs.length>1 && (
@@ -1213,15 +1271,34 @@ function MobileHome({data:defaultData, defaultSheetId}:{data:SheetData; defaultS
           {allTabs.map((tab,i)=>{
             const active=activeIdx===i;
             return(
-              <Pressable key={tab.id+i} onPress={()=>setActiveIdx(i)}
-                style={{paddingHorizontal:12,paddingVertical:7,borderRadius:8,
-                  backgroundColor:active?D.blue:D.card,
-                  borderWidth:1,borderColor:active?D.blue:D.border}}>
-                <Text style={{fontSize:12,fontWeight:'700',color:active?'#fff':D.sub}} numberOfLines={1}>{tab.label}</Text>
-              </Pressable>
+              <View key={tab.id+i} style={{flexDirection:'row',alignItems:'center',gap:3}}>
+                <Pressable onPress={()=>setActiveIdx(i)}
+                  style={{paddingHorizontal:12,paddingVertical:7,borderRadius:8,
+                    backgroundColor:active?D.blue:D.card,
+                    borderWidth:1,borderColor:active?D.blue:D.border}}>
+                  <Text style={{fontSize:12,fontWeight:'700',color:active?'#fff':D.sub}} numberOfLines={1}>{tab.label}</Text>
+                </Pressable>
+                {active&&(
+                  <Pressable onPress={()=>requestRemoveSheet(i)}
+                    style={{width:20,height:20,borderRadius:10,backgroundColor:D.redDim,
+                      borderWidth:1,borderColor:D.red,alignItems:'center',justifyContent:'center'}}>
+                    <Text style={{fontSize:12,color:D.red,fontWeight:'900',lineHeight:14}}>×</Text>
+                  </Pressable>
+                )}
+              </View>
             );
           })}
         </ScrollView>
+      )}
+
+      {allTabs.length===0 && loaded && (
+        <View style={{flex:1,alignItems:'center',justifyContent:'center',gap:14,padding:20}}>
+          <Text style={{color:D.muted,fontSize:14}}>No projects yet.</Text>
+          <TouchableOpacity onPress={()=>setShowAdd(true)}
+            style={{paddingHorizontal:16,paddingVertical:10,backgroundColor:D.blue,borderRadius:8}}>
+            <Text style={{color:'#fff',fontSize:13,fontWeight:'800'}}>+ Add your first project</Text>
+          </TouchableOpacity>
+        </View>
       )}
 
       {tabLoading && (
@@ -1294,28 +1371,11 @@ export default function HomeScreen() {
 
 function HomeScreenInner() {
   const {D}=useTheme();
-  const {data,loading,error,refresh}=useSheetData();
   const {width}=useWindowDimensions();
   const isWeb=Platform.OS==='web'&&width>=768;
 
-  if(loading)return(
-    <View style={{flex:1,backgroundColor:D.bg,alignItems:'center',justifyContent:'center',gap:12}}>
-      <Stack.Screen options={{headerShown:false}}/>
-      <View style={{width:40,height:40,borderRadius:20,backgroundColor:D.blue,opacity:0.15}}/>
-      <Text style={{color:D.muted,fontSize:16,letterSpacing:3,fontWeight:'600'}}>LOADING...</Text>
-    </View>
-  );
-
-  if(error||!data)return(
-    <View style={{flex:1,backgroundColor:D.bg,alignItems:'center',justifyContent:'center',gap:16}}>
-      <Stack.Screen options={{headerShown:false}}/>
-      <Text style={{color:D.red,fontSize:16,fontWeight:'600'}}>⚠ {error??'No data'}</Text>
-      <TouchableOpacity onPress={refresh}
-        style={{paddingHorizontal:20,paddingVertical:12,backgroundColor:D.blue,borderRadius:8}}>
-        <Text style={{color:'#fff',fontSize:14,fontWeight:'700'}}>Retry</Text>
-      </TouchableOpacity>
-    </View>
-  );
-
-  return isWeb?<WebLayout data={data} defaultSheetId={DEFAULT_SHEET_ID}/>:<MobileHome data={data} defaultSheetId={DEFAULT_SHEET_ID}/>;
+  // No sheet is loaded here anymore — WebLayout/MobileHome each manage
+  // their own list of connected Google Sheets via AsyncStorage and fetch
+  // data per-tab. The app starts with zero sheets until the user adds one.
+  return isWeb?<WebLayout/>:<MobileHome/>;
 }
