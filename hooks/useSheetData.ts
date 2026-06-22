@@ -1,5 +1,4 @@
 import { useEffect, useState, useCallback } from 'react';
-import { SHEET_ID } from '../constants';
 
 // ─── Types ───────────────────────────────────────────────────────
 export interface Project {
@@ -148,14 +147,22 @@ async function fetchSheet<T>(sheetName: string, sheetId: string): Promise<T[]> {
 }
 
 // ─── Main hook ───────────────────────────────────────────────────
-export function useSheetData(overrideSheetId?: string) {
+// No sheet ID is hardcoded anywhere in this file. The caller must pass
+// an explicit sheetId (usually the one the user picked/added in the UI).
+// When no sheetId is given, the hook simply returns no data — there is
+// nothing baked into source control for it to fall back to.
+export function useSheetData(sheetId?: string) {
   const [data, setData] = useState<SheetData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const sheetId = overrideSheetId ?? SHEET_ID;
-
   const load = useCallback(async () => {
+    if (!sheetId) {
+      setData(null);
+      setError(null);
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
       setError(null);
