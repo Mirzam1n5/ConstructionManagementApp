@@ -9,29 +9,29 @@ import { SHEET_ID as DEFAULT_SHEET_ID } from '../constants';
 
 // ── Theme palettes ──────────────────────────────────────────────────
 const LIGHT = {
-  bg:'#f0f2f7',       panel:'#ffffff',    card:'#ffffff',     border:'#e2e6ef',
-  text:'#1a1d2e',     sub:'#5a5f7a',      muted:'#9499b5',
-  green:'#1a9e5c',    greenDim:'#e6f7ef',
-  red:'#d63b3b',      redDim:'#fdeaea',
-  yellow:'#c48a00',   yellowDim:'#fdf5e0',
-  blue:'#2872d4',     blueDim:'#e8f0fd',
-  accent:'#6355d4',   accentDim:'#eeecfc',
-  orange:'#d4622a',   orangeDim:'#fdf0ea',
-  cyan:'#0d8fa0',     cyanDim:'#e4f6f8',
-  shadow:'rgba(0,0,0,0.06)',
+  bg:'#f4f1ec',       panel:'#ffffff',    card:'#ffffff',     border:'#e8e2d8',
+  text:'#211d18',     sub:'#6b6258',      muted:'#a39a8d',
+  green:'#3a8f5c',    greenDim:'#e9f3ec',
+  red:'#c2543a',      redDim:'#f8eae5',
+  yellow:'#b8862f',   yellowDim:'#f7eedd',
+  blue:'#5f93b8',     blueDim:'#e9f0f5',
+  accent:'#8a6a4a',   accentDim:'#ece2d4',
+  orange:'#d68a4a',   orangeDim:'#f9eee1',
+  cyan:'#5f93b8',     cyanDim:'#e9f0f5',
+  shadow:'rgba(33,29,24,0.07)',
 };
 
 const DARK = {
-  bg:'#0a0b11',       panel:'#0f1019',    card:'#13141f',     border:'#1e2035',
-  text:'#e8e9f5',     sub:'#6e6e96',      muted:'#3a3a55',
-  green:'#3ecf78',    greenDim:'#0a1e12',
-  red:'#e8504a',      redDim:'#1e0a09',
-  yellow:'#e0b84a',   yellowDim:'#1e1708',
-  blue:'#4d94e8',     blueDim:'#081628',
-  accent:'#8b7ff5',   accentDim:'#120f2a',
-  orange:'#e8854a',   orangeDim:'#1e1008',
-  cyan:'#3ec8c8',     cyanDim:'#071818',
-  shadow:'rgba(0,0,0,0.4)',
+  bg:'#16130f',       panel:'#1c1814',    card:'#221d17',     border:'#332b22',
+  text:'#f3ede3',     sub:'#a89a87',      muted:'#5e5345',
+  green:'#5fa97f',    greenDim:'#16241a',
+  red:'#d97a5c',      redDim:'#2a1812',
+  yellow:'#d6a84f',   yellowDim:'#2a2010',
+  blue:'#7fb0d4',     blueDim:'#101e28',
+  accent:'#c98a52',   accentDim:'#241b10',
+  orange:'#e8a667',   orangeDim:'#2a1f12',
+  cyan:'#7fb0d4',     cyanDim:'#101e28',
+  shadow:'rgba(0,0,0,0.45)',
 };
 
 type Palette = typeof LIGHT;
