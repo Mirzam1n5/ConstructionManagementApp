@@ -124,26 +124,30 @@ function ChartBox({h,children}:{h:number;children:(w:number)=>React.ReactNode}) 
 // ── Arc Gauge ─────────────────────────────────────────────────────
 function ArcGauge({pct,color,size,label,sublabel}:{pct:number;color:string;size:number;label?:string;sublabel?:string}) {
   const {D} = useTheme();
-  const cx=size/2,cy=size*0.62,r=size*0.37,sw=size*0.10;
+  // Soft semi-circle gauge, no needle, no segment ticks — just a smooth
+  // progress arc over a pale 3-stop gradient track, like the reference.
+  const cx=size/2, cy=size*0.58, r=size*0.40, sw=size*0.13;
   const p=Math.min(1,Math.max(0,pct/100));
   const toR=(d:number)=>d*Math.PI/180;
-  const S=210,ARC=240;
+  const S=180, ARC=180; // clean half-circle, flat ends
   const apt=(d:number)=>({x:cx+r*Math.cos(toR(d)),y:cy+r*Math.sin(toR(d))});
   const arc=(f:number,t:number)=>{const s=apt(f),e=apt(t),lg=t-f>180?1:0;return`M${s.x},${s.y} A${r},${r} 0 ${lg} 1 ${e.x},${e.y}`;};
-  const endD=S+ARC*p,nr=toR(endD),nL=r*0.76;
-  const tx=cx+nL*Math.cos(nr),ty=cy+nL*Math.sin(nr);
-  const br=toR(endD+90),bw=sw*0.12;
-  const b1x=cx+bw*Math.cos(br),b1y=cy+bw*Math.sin(br),b2x=cx-bw*Math.cos(br),b2y=cy-bw*Math.sin(br);
-  const segs=[{f:210,t:258,c:D.red},{f:258,t:306,c:D.orange},{f:306,t:354,c:D.yellow},{f:354,t:402,c:D.green},{f:402,t:450,c:'#128a44'}];
+  const endD=S+ARC*p;
+  const gid = `gauge-grad-${Math.round(size)}`;
   return (
-    <Svg width={size} height={size*0.72}>
-      <Path d={arc(S,S+ARC)} fill="none" stroke={D.border} strokeWidth={sw} strokeLinecap="butt"/>
-      {segs.map((sg,i)=><Path key={i} d={arc(sg.f,sg.t)} fill="none" stroke={sg.c} strokeWidth={sw} opacity={0.25} strokeLinecap="butt"/>)}
-      {p>0.001&&<Path d={arc(S,endD)} fill="none" stroke={color} strokeWidth={sw} strokeLinecap="butt"/>}
-      <Path d={`M${b1x},${b1y} L${tx},${ty} L${b2x},${b2y} Z`} fill={D.text}/>
-      <Circle cx={cx} cy={cy} r={sw*0.3} fill={D.text}/>
-      <ST x={cx} y={cy+r*0.22} textAnchor="middle" fontSize={size*0.17} fontWeight="900" fill={color}>{label??fmtP(pct)}</ST>
-      {sublabel&&<ST x={cx} y={cy+r*0.46} textAnchor="middle" fontSize={size*0.095} fill={D.muted}>{sublabel}</ST>}
+    <Svg width={size} height={size*0.66}>
+      <Defs>
+        <LinearGradient id={gid} x1="0" y1="0" x2="1" y2="0">
+          <Stop offset="0" stopColor={color} stopOpacity={1}/>
+          <Stop offset="1" stopColor={D.yellow} stopOpacity={1}/>
+        </LinearGradient>
+      </Defs>
+      {/* pale track */}
+      <Path d={arc(S,S+ARC)} fill="none" stroke={D.border} strokeWidth={sw} strokeLinecap="round"/>
+      {/* progress arc with soft gradient */}
+      {p>0.001&&<Path d={arc(S,endD)} fill="none" stroke={`url(#${gid})`} strokeWidth={sw} strokeLinecap="round"/>}
+      <ST x={cx} y={cy+r*0.05} textAnchor="middle" fontFamily="System" fontSize={size*0.20} fontWeight="800" fill={D.text}>{label??fmtP(pct)}</ST>
+      {sublabel&&<ST x={cx} y={cy+r*0.36} textAnchor="middle" fontFamily="System" fontSize={size*0.10} fontWeight="500" fill={D.muted}>{sublabel}</ST>}
     </Svg>
   );
 }
@@ -166,8 +170,8 @@ function Donut({slices,size,label,sublabel}:{slices:{v:number;c:string}[];size:n
         if(Math.abs(sl.v-total)<0.001)return<Circle key={i} cx={cx} cy={cy} r={r} fill="none" stroke={sl.c} strokeWidth={sw}/>;
         return<Path key={i} d={`M${x1},${y1} A${r},${r} 0 ${lg} 1 ${x2},${y2}`} fill="none" stroke={sl.c} strokeWidth={sw} strokeLinecap="butt"/>;
       })}
-      {label&&<ST x={cx} y={sublabel?cy-2:cy+5} textAnchor="middle" fontSize={size*0.19} fontWeight="900" fill={D.text}>{label}</ST>}
-      {sublabel&&<ST x={cx} y={cy+size*0.13} textAnchor="middle" fontSize={size*0.1} fill={D.muted}>{sublabel}</ST>}
+      {label&&<ST x={cx} y={sublabel?cy-2:cy+5} textAnchor="middle" fontFamily="System" fontSize={size*0.19} fontWeight="800" fill={D.text}>{label}</ST>}
+      {sublabel&&<ST x={cx} y={cy+size*0.13} textAnchor="middle" fontFamily="System" fontSize={size*0.1} fontWeight="500" fill={D.muted}>{sublabel}</ST>}
     </Svg>
   );
 }
@@ -200,7 +204,7 @@ function LineCurve({series,w,h,labels,refLine}:{
         const y=pT+(1-(t-mn)/(mx-mn))*ch;
         return<G key={i}>
           <Line x1={pL} y1={y} x2={w-pR} y2={y} stroke={D.border} strokeWidth={0.8}/>
-          <ST x={pL-4} y={y+4} textAnchor="end" fontSize={9} fill={D.muted}>{t>=1e6?`${(t/1e6).toFixed(1)}M`:t>=1e3?`${(t/1e3).toFixed(0)}K`:t<10?t.toFixed(2):t.toFixed(0)}</ST>
+          <ST fontFamily="System" x={pL-4} y={y+4} textAnchor="end" fontSize={9} fill={D.muted}>{t>=1e6?`${(t/1e6).toFixed(1)}M`:t>=1e3?`${(t/1e3).toFixed(0)}K`:t<10?t.toFixed(2):t.toFixed(0)}</ST>
         </G>;
       })}
       {refLine!=null&&(()=>{const y=pT+(1-(refLine-mn)/(mx-mn))*ch;return<Line x1={pL} y1={y} x2={w-pR} y2={y} stroke={D.yellow} strokeWidth={1.5} strokeDasharray="5,3"/>;})()}
@@ -216,7 +220,7 @@ function LineCurve({series,w,h,labels,refLine}:{
       })}
       {labels&&labels.map((l,i)=>{
         const x=pL+(i/(n-1))*cw;
-        return<ST key={i} x={x} y={h-5} textAnchor="middle" fontSize={9} fill={D.muted}>{l}</ST>;
+        return<ST fontFamily="System" key={i} x={x} y={h-5} textAnchor="middle" fontSize={9} fill={D.muted}>{l}</ST>;
       })}
     </Svg>
   );
@@ -239,12 +243,12 @@ function BarChart({bars,w,h,grouped}:{bars:{label:string;v:number;v2?:number;col
         const lbl2=b.v2!=null?(b.v2>=1e6?`${(b.v2/1e6).toFixed(1)}M`:b.v2>=1e3?`${(b.v2/1e3).toFixed(0)}K`:String(b.v2)):'';
         return<G key={i}>
           <Rect x={x} y={y} width={bw} height={bh} fill={b.color} opacity={0.8} rx={3}/>
-          <ST x={cx-(grouped?bw/2+1:0)} y={y-4} textAnchor="middle" fontSize={10} fill={b.color} fontWeight="700">{lbl}</ST>
+          <ST fontFamily="System" x={cx-(grouped?bw/2+1:0)} y={y-4} textAnchor="middle" fontSize={10} fill={b.color} fontWeight="700">{lbl}</ST>
           {grouped&&b.v2!=null&&<>
             <Rect x={x2} y={y2} width={bw} height={bh2} fill={b.c2??D.orange} opacity={0.7} rx={3}/>
-            <ST x={cx+bw/2+1} y={y2-4} textAnchor="middle" fontSize={10} fill={b.c2??D.orange} fontWeight="700">{lbl2}</ST>
+            <ST fontFamily="System" x={cx+bw/2+1} y={y2-4} textAnchor="middle" fontSize={10} fill={b.c2??D.orange} fontWeight="700">{lbl2}</ST>
           </>}
-          <ST x={cx} y={h-6} textAnchor="middle" fontSize={9} fill={D.muted}>{b.label}</ST>
+          <ST fontFamily="System" x={cx} y={h-6} textAnchor="middle" fontSize={9} fill={D.muted}>{b.label}</ST>
         </G>;
       })}
     </Svg>
@@ -289,7 +293,7 @@ function Gantt({ms,w,h}:{ms:Milestone[];w:number;h:number}) {
         const bx=pL+ps*tw,bw=Math.max(6,(pe-ps)*tw);
         const prog=num(m.progress_pct)/100;
         return<G key={i}>
-          <ST x={pL-6} y={y+rowH*0.67} textAnchor="end" fontSize={9} fill={D.sub}>{(m.milestone_name??'').slice(0,14)}</ST>
+          <ST fontFamily="System" x={pL-6} y={y+rowH*0.67} textAnchor="end" fontSize={9} fill={D.sub}>{(m.milestone_name??'').slice(0,14)}</ST>
           <Rect x={pL} y={y+3} width={tw} height={rowH-6} fill={D.bg} rx={3}/>
           <Rect x={bx} y={y+4} width={bw} height={rowH-8} fill={col} opacity={0.2} rx={3}/>
           {prog>0&&<Rect x={bx} y={y+4} width={bw*prog} height={rowH-8} fill={col} opacity={0.85} rx={3}/>}
@@ -335,7 +339,7 @@ function GanttFit({ms,w,h}:{ms:Milestone[];w:number;h:number}) {
         const prog=num(m.progress_pct)/100;
         const barH=Math.max(4,rowH-6);
         return<G key={i}>
-          <ST x={pL-6} y={y+rowH*0.65} textAnchor="end" fontSize={fontSize} fill={D.sub}>{(m.milestone_name??'').slice(0,Math.floor(pL/6))}</ST>
+          <ST fontFamily="System" x={pL-6} y={y+rowH*0.65} textAnchor="end" fontSize={fontSize} fill={D.sub}>{(m.milestone_name??'').slice(0,Math.floor(pL/6))}</ST>
           <Rect x={pL} y={y+(rowH-barH)/2} width={tw} height={barH} fill={D.bg} rx={2}/>
           <Rect x={bx} y={y+(rowH-barH)/2} width={bw} height={barH} fill={col} opacity={0.2} rx={2}/>
           {prog>0&&<Rect x={bx} y={y+(rowH-barH)/2} width={bw*prog} height={barH} fill={col} opacity={0.85} rx={2}/>}
