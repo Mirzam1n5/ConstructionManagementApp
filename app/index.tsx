@@ -174,7 +174,7 @@ function Donut({slices,size,label,sublabel}:{slices:{v:number;c:string}[];size:n
 
 // ── Line / S-Curve ────────────────────────────────────────────────
 function LineCurve({series,w,h,labels,refLine}:{
-  series:{data:number[];color:string;dashed?:boolean}[];
+  series:{data:number[];color:string;dashed?:boolean;strokeWidth?:number}[];
   w:number;h:number;labels?:string[];refLine?:number;
 }) {
   const {D} = useTheme();
@@ -210,7 +210,7 @@ function LineCurve({series,w,h,labels,refLine}:{
         const area=`${d} L${pts[pts.length-1].x},${pT+ch} L${pts[0].x},${pT+ch} Z`;
         return<G key={si}>
           <Path d={area} fill={`url(#lg${si})`}/>
-          <Path d={d} fill="none" stroke={s.color} strokeWidth={s.dashed?2:2.5} strokeDasharray={s.dashed?'6,3':undefined} strokeLinejoin="round"/>
+          <Path d={d} fill="none" stroke={s.color} strokeWidth={s.strokeWidth??(s.dashed?2:2.5)} strokeDasharray={s.dashed?'6,3':undefined} strokeLinejoin="round"/>
           {pts.map((p,i)=><Circle key={i} cx={p.x} cy={p.y} r={3} fill={s.color}/>)}
         </G>;
       })}
@@ -504,42 +504,10 @@ function ProjectDashboardTV({p,data,color}:{p:Project;data:SheetData;color:strin
         </Card>
       </View>
 
-      {/* ══ ROW 2: Budget by Category | EVM S-Curve | CPI/SPI trend ══ */}
-      <View style={{flex:5,flexDirection:'row',gap:8}}>
-        <Card style={{flex:2,padding:12,gap:6}}>
-          <SH label="Budget by Category" color={D.orange}/>
-          <View style={{flex:1,flexDirection:'row',gap:10,alignItems:'center'}}>
-            <Donut
-              slices={catData.map((c,i)=>({v:c.ac,c:DC[i%7]}))}
-              size={72}
-              label={fmtM(catData.reduce((s,c)=>s+c.ac,0))}
-              sublabel="actual"
-            />
-            <View style={{flex:1,gap:4}}>
-              {catData.map((c,i)=>{
-                const over=c.ac>c.pl;
-                const pct=c.pl>0?Math.round((c.ac/c.pl)*100):0;
-                return(
-                  <View key={c.cat} style={{gap:2}}>
-                    <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between'}}>
-                      <View style={{flexDirection:'row',alignItems:'center',gap:4,flex:1}}>
-                        <View style={{width:7,height:7,borderRadius:3.5,backgroundColor:DC[i%7]}}/>
-                        <Text style={{fontSize:10,color:D.text,flex:1}} numberOfLines={1}>{c.cat}</Text>
-                      </View>
-                      <Text style={{fontSize:10,fontWeight:'800',color:over?D.red:D.green,marginLeft:4}}>{pct}%</Text>
-                    </View>
-                    <View style={{height:4,backgroundColor:D.bg,borderRadius:2,overflow:'hidden'}}>
-                      <View style={{position:'absolute',top:0,left:0,height:4,width:`${Math.min((c.pl/catData[0].pl)*100,100)}%` as any,backgroundColor:DC[i%7],opacity:0.25,borderRadius:2}}/>
-                      <View style={{position:'absolute',top:0,left:0,height:4,width:`${Math.min((c.ac/catData[0].pl)*100,100)}%` as any,backgroundColor:over?D.red:DC[i%7],borderRadius:2}}/>
-                    </View>
-                  </View>
-                );
-              })}
-            </View>
-          </View>
-        </Card>
-        {evm.length>=2&&<>
-          <Card style={{flex:3,padding:12,gap:6}}>
+      {/* ══ ROW 2: EVM S-Curve | CPI/SPI Trend ══ */}
+      {evm.length>=2&&(
+        <View style={{flex:6,flexDirection:'row',gap:8}}>
+          <Card style={{flex:3,padding:12,gap:8}}>
             <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between'}}>
               <SH label="EVM S-Curve" color={color}/>
               {latestEvm&&(
@@ -549,69 +517,56 @@ function ProjectDashboardTV({p,data,color}:{p:Project;data:SheetData;color:strin
                     {l:'CV', v:(num(latestEvm.cv_usd)>=0?'+':'')+fmtM(num(latestEvm.cv_usd)),c:num(latestEvm.cv_usd)>=0?D.green:D.red},
                     {l:'SV', v:(num(latestEvm.sv_usd)>=0?'+':'')+fmtM(num(latestEvm.sv_usd)),c:num(latestEvm.sv_usd)>=0?D.green:D.red},
                   ].map(item=>(
-                    <View key={item.l} style={{backgroundColor:D.bg,borderWidth:1,borderColor:D.border,paddingHorizontal:7,paddingVertical:2,alignItems:'center',borderRadius:5}}>
-                      <Text style={{fontSize:8,color:D.muted}}>{item.l}</Text>
-                      <Text style={{fontSize:11,fontWeight:'800',color:item.c}}>{item.v}</Text>
+                    <View key={item.l} style={{backgroundColor:D.bg,borderWidth:1,borderColor:D.border,paddingHorizontal:10,paddingVertical:4,alignItems:'center',borderRadius:6,minWidth:70}}>
+                      <Text style={{fontSize:9,color:D.muted,letterSpacing:1}}>{item.l}</Text>
+                      <Text style={{fontSize:14,fontWeight:'800',color:item.c}}>{item.v}</Text>
                     </View>
                   ))}
                 </View>
               )}
             </View>
             <ChartBox2>{(cw,ch)=><LineCurve
-              series={[{data:pvS,color:D.blue,dashed:true},{data:evS,color:D.green},{data:acS,color:D.red}]}
+              series={[{data:pvS,color:D.blue,dashed:true,strokeWidth:3},{data:evS,color:D.green,strokeWidth:3},{data:acS,color:D.red,strokeWidth:3}]}
               w={cw} h={ch} labels={evmMonths}
             />}</ChartBox2>
             <Legend items={[{label:'Planned Value',color:D.blue},{label:'Earned Value',color:D.green},{label:'Actual Cost',color:D.red}]}/>
           </Card>
-          <Card style={{flex:2,padding:12,gap:6}}>
+          <Card style={{flex:2,padding:12,gap:8}}>
             <SH label="CPI & SPI Trend" color={color}/>
             <ChartBox2>{(cw,ch)=><LineCurve
-              series={[{data:cpiS,color:D.green},{data:spiS,color:D.yellow}]}
+              series={[{data:cpiS,color:D.green,strokeWidth:3},{data:spiS,color:D.yellow,strokeWidth:3}]}
               w={cw} h={ch} labels={evmMonths} refLine={1}
             />}</ChartBox2>
-            <Legend items={[{label:'CPI',color:D.green},{label:'SPI',color:D.yellow},{label:'1.0',color:D.yellow}]}/>
+            <Legend items={[{label:'CPI',color:D.green},{label:'SPI',color:D.yellow},{label:'1.0',color:D.muted}]}/>
           </Card>
-        </>}
-      </View>
-
-      {/* ══ ROW 3: Budget Pie ══ */}
-      <View style={{flex:4,flexDirection:'row',gap:8}}>
-
-        {/* Budget by Category — Pie */}
-        <Card style={{flex:1,padding:12,gap:8}}>
-          <SH label="Budget by Category" color={D.orange}/>
-          <View style={{flex:1,flexDirection:'row',gap:12,alignItems:'center'}}>
-            <Donut
-              slices={catData.map((c,i)=>({v:c.ac,c:DC[i%7]}))}
-              size={88}
-              label={fmtM(catData.reduce((s,c)=>s+c.ac,0))}
-              sublabel="actual"
-            />
-            <View style={{flex:1,gap:5}}>
-              {catData.map((c,i)=>{
-                const over=c.ac>c.pl;
-                const pct=c.pl>0?Math.round((c.ac/c.pl)*100):0;
-                return(
-                  <View key={c.cat} style={{gap:2}}>
-                    <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between'}}>
+          <Card style={{flex:1.5,padding:12,gap:8}}>
+            <SH label="Budget by Category" color={D.orange}/>
+            <View style={{flex:1,alignItems:'center',justifyContent:'center',gap:8}}>
+              <Donut
+                slices={catData.map((c,i)=>({v:c.ac,c:DC[i%7]}))}
+                size={90}
+                label={fmtM(catData.reduce((s,c)=>s+c.ac,0))}
+                sublabel="actual"
+              />
+              <View style={{gap:5,alignSelf:'stretch'}}>
+                {catData.map((c,i)=>{
+                  const over=c.ac>c.pl;
+                  const pct=c.pl>0?Math.round((c.ac/c.pl)*100):0;
+                  return(
+                    <View key={c.cat} style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between'}}>
                       <View style={{flexDirection:'row',alignItems:'center',gap:5,flex:1}}>
-                        <View style={{width:8,height:8,borderRadius:4,backgroundColor:DC[i%7]}}/>
-                        <Text style={{fontSize:11,color:D.text,flex:1}} numberOfLines={1}>{c.cat}</Text>
+                        <View style={{width:7,height:7,borderRadius:3.5,backgroundColor:DC[i%7]}}/>
+                        <Text style={{fontSize:10,color:D.text,flex:1}} numberOfLines={1}>{c.cat}</Text>
                       </View>
-                      <Text style={{fontSize:11,fontWeight:'800',color:over?D.red:D.green,marginLeft:6}}>{pct}%</Text>
+                      <Text style={{fontSize:10,fontWeight:'800',color:over?D.red:D.green}}>{pct}%</Text>
                     </View>
-                    <View style={{height:4,backgroundColor:D.bg,borderRadius:2,overflow:'hidden'}}>
-                      <View style={{position:'absolute',top:0,left:0,height:4,width:`${Math.min((c.pl/catData[0].pl)*100,100)}%` as any,backgroundColor:DC[i%7],opacity:0.25,borderRadius:2}}/>
-                      <View style={{position:'absolute',top:0,left:0,height:4,width:`${Math.min((c.ac/catData[0].pl)*100,100)}%` as any,backgroundColor:over?D.red:DC[i%7],borderRadius:2}}/>
-                    </View>
-                  </View>
-                );
-              })}
+                  );
+                })}
+              </View>
             </View>
-          </View>
-        </Card>
-
-      </View>
+          </Card>
+        </View>
+      )}
 
     </View>
   );
@@ -786,35 +741,31 @@ function ProjectDashboard({p,data,color}:{p:Project;data:SheetData;color:string}
         {/* Budget by Category */}
         <Card style={{flex:2,padding:16,gap:10}}>
           <SH label="Budget by Category" color={D.orange}/>
-          <View style={{flex:1,flexDirection:'row',gap:14,alignItems:'center'}}>
-            <Donut
-              slices={catData.map((c,i)=>({v:c.ac,c:DC[i%7]}))}
-              size={90}
-              label={fmtM(catData.reduce((s,c)=>s+c.ac,0))}
-              sublabel="actual"
-            />
-            <View style={{flex:1,gap:6}}>
-              {catData.map((c,i)=>{
-                const over=c.ac>c.pl;
-                const pct=c.pl>0?Math.round((c.ac/c.pl)*100):0;
-                return(
-                  <View key={c.cat} style={{gap:2}}>
-                    <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between'}}>
-                      <View style={{flexDirection:'row',alignItems:'center',gap:5,flex:1}}>
-                        <View style={{width:8,height:8,borderRadius:4,backgroundColor:DC[i%7]}}/>
-                        <Text style={{fontSize:11,color:D.text,flex:1}} numberOfLines={1}>{c.cat}</Text>
-                      </View>
-                      <Text style={{fontSize:11,fontWeight:'800',color:over?D.red:D.green,marginLeft:6}}>{pct}%</Text>
+          <View style={{flex:1,gap:8,justifyContent:'center'}}>
+            {catData.map((c,i)=>{
+              const max=catData[0]?.pl??1,over=c.ac>c.pl;
+              const pct=c.pl>0?Math.round((c.ac/c.pl)*100):0;
+              return(
+                <View key={c.cat} style={{gap:3}}>
+                  <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between'}}>
+                    <View style={{flexDirection:'row',alignItems:'center',gap:6,flex:1}}>
+                      <View style={{width:8,height:8,borderRadius:4,backgroundColor:DC[i%7]}}/>
+                      <Text style={{fontSize:12,color:D.text,flex:1}} numberOfLines={1}>{c.cat}</Text>
                     </View>
-                    <View style={{height:5,backgroundColor:D.bg,borderRadius:2,overflow:'hidden'}}>
-                      <View style={{position:'absolute',top:0,left:0,height:5,width:`${Math.min((c.pl/catData[0].pl)*100,100)}%` as any,backgroundColor:DC[i%7],opacity:0.25,borderRadius:2}}/>
-                      <View style={{position:'absolute',top:0,left:0,height:5,width:`${Math.min((c.ac/catData[0].pl)*100,100)}%` as any,backgroundColor:over?D.red:DC[i%7],borderRadius:2}}/>
+                    <View style={{flexDirection:'row',alignItems:'center',gap:8}}>
+                      <Text style={{fontSize:11,color:D.muted}}>{fmtM(c.ac)}</Text>
+                      <Text style={{fontSize:11,fontWeight:'800',color:over?D.red:D.green,minWidth:36,textAlign:'right'}}>{pct}%</Text>
                     </View>
                   </View>
-                );
-              })}
-            </View>
+                  <View style={{height:8,backgroundColor:D.bg,borderRadius:4,overflow:'hidden'}}>
+                    <View style={{position:'absolute',top:0,left:0,height:8,width:`${(c.pl/max)*100}%` as any,backgroundColor:DC[i%7],opacity:0.25,borderRadius:4}}/>
+                    <View style={{position:'absolute',top:0,left:0,height:8,width:`${(c.ac/max)*100}%` as any,backgroundColor:over?D.red:DC[i%7],opacity:0.85,borderRadius:4}}/>
+                  </View>
+                </View>
+              );
+            })}
           </View>
+          <Legend items={[{label:'Planned',color:D.blue},{label:'Actual',color:D.green}]}/>
         </Card>
       </View>
 
@@ -856,57 +807,6 @@ function ProjectDashboard({p,data,color}:{p:Project;data:SheetData;color:string}
         </View>
       )}
 
-      {/* ══ ROW 5: Issues ══ */}
-      {issues.length>0&&(
-        <View style={{flexDirection:isNarrow?'column':'row',gap:14}}>
-          <Card style={{flex:1,minWidth:160,maxWidth:240,padding:16,gap:12}}>
-            <SH label="Issues" color={D.red}/>
-            <View style={{alignItems:'center'}}>
-              <Donut slices={[
-                {v:issues.filter(i=>i.status==='Open'&&i.priority==='High').length,c:D.red},
-                {v:issues.filter(i=>i.status==='Open'&&i.priority==='Medium').length,c:D.yellow},
-                {v:issues.filter(i=>i.status==='Open'&&i.priority==='Low').length,c:D.blue},
-                {v:issues.filter(i=>i.status!=='Open').length,c:D.green},
-              ]} size={88} label={String(openIss)} sublabel="open"/>
-            </View>
-            <View style={{gap:6}}>
-              {[{l:'High',c:D.red},{l:'Medium',c:D.yellow},{l:'Low',c:D.blue},{l:'Resolved',c:D.green}].map(row=>{
-                const cnt=row.l==='Resolved'?issues.filter(i=>i.status!=='Open').length:issues.filter(i=>i.status==='Open'&&i.priority===row.l).length;
-                return(
-                  <View key={row.l} style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between'}}>
-                    <View style={{flexDirection:'row',alignItems:'center',gap:6}}>
-                      <View style={{width:8,height:8,borderRadius:4,backgroundColor:row.c}}/>
-                      <Text style={{fontSize:12,color:D.sub}}>{row.l}</Text>
-                    </View>
-                    <Text style={{fontSize:14,color:row.c,fontWeight:'800'}}>{cnt}</Text>
-                  </View>
-                );
-              })}
-            </View>
-          </Card>
-          <Card style={{flex:1,padding:16,gap:6}}>
-            <SH label="Open Issues" color={D.red}/>
-            {issues.filter(i=>i.status==='Open').length===0
-              ?<View style={{flex:1,alignItems:'center',justifyContent:'center',padding:20}}>
-                  <Text style={{fontSize:14,color:D.green,fontWeight:'700'}}>✓ No open issues</Text>
-                </View>
-              :issues.filter(i=>i.status==='Open').slice(0,10).map((iss,i)=>{
-                const pc=iss.priority==='High'?D.red:iss.priority==='Medium'?D.yellow:D.blue;
-                return(
-                  <View key={i} style={{flexDirection:'row',alignItems:'center',gap:10,paddingVertical:8,borderBottomWidth:1,borderBottomColor:D.border}}>
-                    <View style={{paddingHorizontal:7,paddingVertical:2,backgroundColor:pc+'18',borderWidth:1,borderColor:pc,borderRadius:4}}>
-                      <Text style={{fontSize:9,color:pc,fontWeight:'800',letterSpacing:1}}>{iss.priority?.toUpperCase()??'—'}</Text>
-                    </View>
-                    <Text style={{flex:1,fontSize:12,color:D.text}} numberOfLines={1}>{iss.title}</Text>
-                    {iss.assigned_to&&<Text style={{fontSize:10,color:D.sub}}>{iss.assigned_to}</Text>}
-                    {iss.due_date&&<Text style={{fontSize:10,color:D.muted}}>{iss.due_date}</Text>}
-                  </View>
-                );
-              })
-            }
-          </Card>
-        </View>
-      )}
 
     </View>
   );
