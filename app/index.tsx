@@ -9,28 +9,28 @@ import { SHEET_ID as DEFAULT_SHEET_ID } from '../constants';
 
 // ── Theme palettes ──────────────────────────────────────────────────
 const LIGHT = {
-  bg:'#f4f1ec',       panel:'#ffffff',    card:'#ffffff',     border:'#e8e2d8',
-  text:'#211d18',     sub:'#6b6258',      muted:'#a39a8d',
+  bg:'#f5f6f8',       panel:'#ffffff',    card:'#ffffff',     border:'#e8e9ed',
+  text:'#15161a',     sub:'#6b6d76',      muted:'#9b9da6',
   green:'#3a8f5c',    greenDim:'#e9f3ec',
   red:'#c2543a',      redDim:'#f8eae5',
   yellow:'#b8862f',   yellowDim:'#f7eedd',
   blue:'#5f93b8',     blueDim:'#e9f0f5',
-  accent:'#8a6a4a',   accentDim:'#ece2d4',
+  accent:'#8a6a4a',   accentDim:'#f0e7da',
   orange:'#d68a4a',   orangeDim:'#f9eee1',
   cyan:'#5f93b8',     cyanDim:'#e9f0f5',
-  shadow:'rgba(33,29,24,0.07)',
+  shadow:'rgba(15,16,20,0.06)',
 };
 
 const DARK = {
-  bg:'#16130f',       panel:'#1c1814',    card:'#221d17',     border:'#332b22',
-  text:'#f3ede3',     sub:'#a89a87',      muted:'#5e5345',
-  green:'#5fa97f',    greenDim:'#16241a',
-  red:'#d97a5c',      redDim:'#2a1812',
-  yellow:'#d6a84f',   yellowDim:'#2a2010',
-  blue:'#7fb0d4',     blueDim:'#101e28',
-  accent:'#c98a52',   accentDim:'#241b10',
-  orange:'#e8a667',   orangeDim:'#2a1f12',
-  cyan:'#7fb0d4',     cyanDim:'#101e28',
+  bg:'#0e0f12',       panel:'#15161a',    card:'#1a1b20',     border:'#262830',
+  text:'#f0f1f4',     sub:'#8e9099',      muted:'#4a4c55',
+  green:'#5fa97f',    greenDim:'#13201a',
+  red:'#d97a5c',      redDim:'#241510',
+  yellow:'#d6a84f',   yellowDim:'#241e10',
+  blue:'#7fb0d4',     blueDim:'#10202c',
+  accent:'#c98a52',   accentDim:'#221a10',
+  orange:'#e8a667',   orangeDim:'#241c10',
+  cyan:'#7fb0d4',     cyanDim:'#10202c',
   shadow:'rgba(0,0,0,0.45)',
 };
 
