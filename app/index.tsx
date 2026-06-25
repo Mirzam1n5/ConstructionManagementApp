@@ -391,7 +391,7 @@ function ProjectDashboardTV({p,data,color}:{p:Project;data:SheetData;color:strin
   const catData=cats.map(cat=>{
     const rows=budget.filter(b=>b.category===cat);
     return{cat,pl:rows.reduce((s,r)=>s+num(r.planned_usd),0),ac:rows.reduce((s,r)=>s+num(r.actual_usd),0)};
-  }).sort((a,b)=>b.pl-a.pl).slice(0,4);
+  }).sort((a,b)=>b.pl-a.pl).slice(0,10);
 
   const phases=[...new Set(schedule.map(m=>m.phase))].filter(Boolean) as string[];
   const msDone=schedule.filter(m=>m.status==='Done').length;
@@ -540,14 +540,15 @@ function ProjectDashboardTV({p,data,color}:{p:Project;data:SheetData;color:strin
           </Card>
           <Card style={{flex:1.8,padding:18,gap:10}}>
             <SH label="Budget by Category" color={D.orange}/>
-            <View style={{flex:1,alignItems:'center',gap:14}}>
+            <View style={{alignItems:'center'}}>
               <Donut
                 slices={catData.map((c,i)=>({v:c.ac,c:DC[i%7]}))}
-                size={120}
+                size={108}
                 label={fmtM(catData.reduce((s,c)=>s+c.ac,0))}
                 sublabel="actual"
               />
-              <View style={{gap:10,alignSelf:'stretch'}}>
+            </View>
+            <ScrollView style={{flex:1}} showsVerticalScrollIndicator={false} contentContainerStyle={{gap:9}}>
                 {catData.map((c,i)=>{
                   const over=c.ac>c.pl;
                   const pct=c.pl>0?Math.round((c.ac/c.pl)*100):0;
@@ -566,8 +567,7 @@ function ProjectDashboardTV({p,data,color}:{p:Project;data:SheetData;color:strin
                     </View>
                   );
                 })}
-              </View>
-            </View>
+            </ScrollView>
           </Card>
         </View>
       )}
@@ -623,7 +623,7 @@ function ProjectDashboard({p,data,color}:{p:Project;data:SheetData;color:string}
   const catData=cats.map(cat=>{
     const rows=budget.filter(b=>b.category===cat);
     return{cat,pl:rows.reduce((s,r)=>s+num(r.planned_usd),0),ac:rows.reduce((s,r)=>s+num(r.actual_usd),0)};
-  }).sort((a,b)=>b.pl-a.pl).slice(0,5);
+  }).sort((a,b)=>b.pl-a.pl).slice(0,10);
 
   const phases=[...new Set(schedule.map(m=>m.phase))].filter(Boolean) as string[];
   const msDone=schedule.filter(m=>m.status==='Done').length;
