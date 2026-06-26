@@ -126,6 +126,27 @@ function sheetUrl(sheetName: string, sheetId: string): string {
   return `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&sheet=${encoded}`;
 }
 
+// Google's gviz API returns date/datetime cells as the literal string
+// "Date(2026,0,1)" (year, zero-indexed month, day[, h, m, s]) instead of
+// a normal date string — this happens especially often when the cell's
+// value comes from a formula like IMPORTRANGE/QUERY rather than being
+// typed in directly. We detect that shape and convert it to a clean
+// "YYYY-MM-DD" string so the rest of the app can treat every date the
+// same way regardless of how the sheet produced it.
+const GVIZ_DATE_RE = /^Date\((\d+),(\d+),(\d+)(?:,(\d+),(\d+),(\d+))?\)$/;
+
+function normalizeCellValue(value: any): any {
+  if (typeof value !== 'string') return value;
+  const m = value.match(GVIZ_DATE_RE);
+  if (!m) return value;
+  const [, y, mo, d] = m;
+  const year = Number(y);
+  const month = Number(mo) + 1; // gviz months are 0-indexed
+  const day = Number(d);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${year}-${pad(month)}-${pad(day)}`;
+}
+
 async function fetchSheet<T>(sheetName: string, sheetId: string): Promise<T[]> {
   const url = sheetUrl(sheetName, sheetId);
   const res = await fetch(url);
@@ -139,7 +160,7 @@ async function fetchSheet<T>(sheetName: string, sheetId: string): Promise<T[]> {
       const obj: Record<string, any> = {};
       cols.forEach((col, i) => {
         const cell = row.c[i];
-        obj[col] = cell ? (cell.v ?? '') : '';
+        obj[col] = cell ? normalizeCellValue(cell.v ?? '') : '';
       });
       return obj as T;
     });
