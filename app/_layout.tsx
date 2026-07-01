@@ -1,24 +1,28 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { COLORS } from '../constants';
+import { ThemeContext, usePersistedTheme, DARK, LIGHT } from '../hooks/useTheme';
 
 export default function RootLayout() {
+  const [isDark, setIsDark] = usePersistedTheme();
+  const D = isDark ? DARK : LIGHT;
+  const toggleTheme = () => setIsDark(v => !v);
+
   return (
-    <>
-      <StatusBar style="light" />
+    <ThemeContext.Provider value={{ D, isDark, toggleTheme }}>
+      <StatusBar style={isDark ? 'light' : 'dark'} />
       <Stack
         screenOptions={{
-          headerStyle: { backgroundColor: COLORS.darkGray },
+          headerStyle: { backgroundColor: D.panel },
           headerShadowVisible: false,
           headerTitleStyle: {
-            fontWeight: '500',
-            fontSize: 16,
-            color: COLORS.white,
+            fontWeight: '700',
+            fontSize: 15,
+            color: D.text,
           },
-          headerTintColor: COLORS.white,
-          contentStyle: { backgroundColor: COLORS.black },
+          headerTintColor: D.text,
+          contentStyle: { backgroundColor: D.bg },
         }}
       />
-    </>
+    </ThemeContext.Provider>
   );
 }
