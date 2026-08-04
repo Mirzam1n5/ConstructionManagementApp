@@ -102,18 +102,32 @@ function Card({children,style}:{children:React.ReactNode;style?:any}) {
   );
 }
 
-// ── Small labeled stat chip (used in dashboard header) ──────────────
-function Stat({label,value,color}:{label:string;value:string;color?:string}) {
+// ── Small labeled stat chip (used in dashboard headers) ─────────────
+function Stat({label,value,color,sub,subColor,size='sm'}:{label:string;value:string;color?:string;sub?:string;subColor?:string;size?:'sm'|'lg'}) {
   const {D} = useTheme();
+  const big = size==='lg';
   return (
     <View style={{
       backgroundColor:D.bg, borderRadius:10, borderWidth:1, borderColor:D.border,
-      paddingHorizontal:13, paddingVertical:7, alignItems:'flex-end', minWidth:74,
+      paddingHorizontal:big?14:13, paddingVertical:big?8:7, alignItems:'flex-end', minWidth:big?84:74,
     }}>
-      <Text style={{fontSize:8.5,color:D.muted,letterSpacing:1,textTransform:'uppercase',marginBottom:2}}>{label}</Text>
-      <Text style={{fontSize:14,fontWeight:'800',color:color??D.text}}>{value}</Text>
+      <Text style={{fontSize:big?9:8.5,color:D.muted,letterSpacing:1,textTransform:'uppercase',marginBottom:2}}>{label}</Text>
+      <Text style={{fontSize:big?16:14,fontWeight:'900',color:color??D.text}}>{value}</Text>
+      {sub&&<Text style={{fontSize:big?10:9,fontWeight:'700',color:subColor??D.muted,marginTop:1}}>{sub}</Text>}
     </View>
   );
+}
+
+// ── Vertical divider between header stat groups ──────────────────────
+function VDivider() {
+  const {D} = useTheme();
+  return <View style={{width:1,alignSelf:'stretch',backgroundColor:D.border,marginVertical:2}}/>;
+}
+
+// ── Small uppercase label above a group of header stats ─────────────
+function GroupLabel({children}:{children:React.ReactNode}) {
+  const {D} = useTheme();
+  return <Text style={{fontSize:8,color:D.muted,letterSpacing:1.5,fontWeight:'800',marginBottom:5}}>{children}</Text>;
 }
 
 function Clock() {
@@ -518,44 +532,43 @@ function ProjectDashboardTV({p,data,color}:{p:Project;data:SheetData;color:strin
             <Text style={{fontSize:12,color:D.sub}}>{p.client} · {p.location}</Text>
           </View>
           <View style={{flex:1}}/>
-          {/* Schedule info chips */}
-          <View style={{flexDirection:'row',gap:8}}>
-            {deviationDays!=null&&<View style={{backgroundColor:D.bg,borderRadius:10,borderWidth:1,borderColor:D.border,paddingHorizontal:14,paddingVertical:8,alignItems:'center'}}>
-              <Text style={{fontSize:9,color:D.muted,letterSpacing:1,textTransform:'uppercase'}}>Deviation</Text>
-              <Text style={{fontSize:16,fontWeight:'900',color:deviationDays>0?D.red:D.green}}>{deviationDays>0?'+':''}{deviationDays}d</Text>
-            </View>}
-            {forecastEnd&&<View style={{backgroundColor:D.bg,borderRadius:10,borderWidth:1,borderColor:D.border,paddingHorizontal:14,paddingVertical:8,alignItems:'center'}}>
-              <Text style={{fontSize:9,color:D.muted,letterSpacing:1,textTransform:'uppercase'}}>Forecast End</Text>
-              <Text style={{fontSize:16,fontWeight:'900',color:D.text}}>{forecastEnd}</Text>
-            </View>}
-            {planPct!=null&&<View style={{backgroundColor:D.bg,borderRadius:10,borderWidth:1,borderColor:D.border,paddingHorizontal:14,paddingVertical:8,alignItems:'center'}}>
-              <Text style={{fontSize:9,color:D.muted,letterSpacing:1,textTransform:'uppercase'}}>Plan %</Text>
-              <Text style={{fontSize:16,fontWeight:'900',color:D.text}}>{fmtP(planPct)}</Text>
-            </View>}
-            {devPct!=null&&<View style={{backgroundColor:D.bg,borderRadius:10,borderWidth:1,borderColor:D.border,paddingHorizontal:14,paddingVertical:8,alignItems:'center'}}>
-              <Text style={{fontSize:9,color:D.muted,letterSpacing:1,textTransform:'uppercase'}}>Deviation %</Text>
-              <Text style={{fontSize:16,fontWeight:'900',color:devPct<0?D.red:D.green}}>{devPct>0?'+':''}{devPct.toFixed(1)}%</Text>
-            </View>}
-            <View style={{backgroundColor:D.bg,borderRadius:10,borderWidth:1,borderColor:D.border,paddingHorizontal:14,paddingVertical:8,alignItems:'center'}}>
-              <Text style={{fontSize:9,color:D.muted,letterSpacing:1,textTransform:'uppercase'}}>Fact %</Text>
-              <Text style={{fontSize:16,fontWeight:'900',color:D.text}}>{fmtP(prog)}</Text>
+
+          {/* Schedule group */}
+          <View>
+            <GroupLabel>Schedule</GroupLabel>
+            <View style={{flexDirection:'row',gap:8}}>
+              {forecastEnd&&<Stat size="lg" label="Forecast End" value={forecastEnd}
+                sub={deviationDays!=null?`${deviationDays>0?'+':''}${deviationDays}d vs plan`:undefined}
+                subColor={deviationDays!=null?(deviationDays>0?D.red:D.green):undefined}/>}
+              {planPct!=null&&<Stat size="lg" label="Plan → Fact" value={`${fmtP(planPct)} → ${fmtP(prog)}`}
+                sub={devPct!=null?`${devPct>0?'+':''}${devPct.toFixed(1)}%`:undefined}
+                subColor={devPct!=null?(devPct<0?D.red:D.green):undefined}/>}
             </View>
-            {[
-              {l:'Budget',v:fmtM(total),c:D.text},
-              {l:'Spent',v:fmtM(spent),c:bCol,s:fmtP(bPct)},
-            ].map(kpi=>(
-              <View key={kpi.l} style={{backgroundColor:D.bg,borderRadius:10,borderWidth:1,borderColor:D.border,paddingHorizontal:14,paddingVertical:8,alignItems:'center',minWidth:80}}>
-                <Text style={{fontSize:9,color:D.muted,letterSpacing:1,textTransform:'uppercase'}}>{kpi.l}</Text>
-                <Text style={{fontSize:16,fontWeight:'900',color:kpi.c,lineHeight:20}}>{kpi.v}</Text>
-                {kpi.s&&<Text style={{fontSize:9,color:D.muted}}>{kpi.s}</Text>}
+          </View>
+
+          <VDivider/>
+
+          {/* Budget group */}
+          <View>
+            <GroupLabel>Budget</GroupLabel>
+            <View style={{flexDirection:'row',gap:8}}>
+              <Stat size="lg" label="Budget" value={fmtM(total)}/>
+              <Stat size="lg" label="Spent" value={fmtM(spent)} color={bCol} sub={fmtP(bPct)+' used'}/>
+            </View>
+          </View>
+
+          <VDivider/>
+
+          {/* Index group */}
+          <View>
+            <GroupLabel>Index</GroupLabel>
+            <View style={{flexDirection:'row',gap:8}}>
+              <View style={{backgroundColor:D.bg,borderRadius:10,borderWidth:1,borderColor:D.border,padding:6,alignItems:'center'}}>
+                <NeedleGauge value={cpi} label="CPI" size={72}/>
               </View>
-            ))}
-            {/* CPI/SPI mini needles in header */}
-            <View style={{backgroundColor:D.bg,borderRadius:10,borderWidth:1,borderColor:D.border,padding:6,alignItems:'center'}}>
-              <NeedleGauge value={cpi} label="CPI" size={72}/>
-            </View>
-            <View style={{backgroundColor:D.bg,borderRadius:10,borderWidth:1,borderColor:D.border,padding:6,alignItems:'center'}}>
-              <NeedleGauge value={spi} label="SPI" size={72}/>
+              <View style={{backgroundColor:D.bg,borderRadius:10,borderWidth:1,borderColor:D.border,padding:6,alignItems:'center'}}>
+                <NeedleGauge value={spi} label="SPI" size={72}/>
+              </View>
             </View>
           </View>
         </View>
