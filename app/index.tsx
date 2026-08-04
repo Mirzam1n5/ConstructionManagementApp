@@ -535,11 +535,18 @@ function ProjectDashboardTV({p,data,color}:{p:Project;data:SheetData;color:strin
                 {kpi.s&&<Text style={{fontSize:9,color:D.muted}}>{kpi.s}</Text>}
               </View>
             ))}
+            {/* CPI/SPI mini needles in header */}
+            <View style={{backgroundColor:D.bg,borderRadius:10,borderWidth:1,borderColor:D.border,padding:6,alignItems:'center'}}>
+              <NeedleGauge value={cpi} label="CPI" size={72}/>
+            </View>
+            <View style={{backgroundColor:D.bg,borderRadius:10,borderWidth:1,borderColor:D.border,padding:6,alignItems:'center'}}>
+              <NeedleGauge value={spi} label="SPI" size={72}/>
+            </View>
           </View>
         </View>
       </Card>
 
-      {/* ══ ROW 1: Gauge | CPI/SPI | Milestones (full) ══ */}
+      {/* ══ ROW 1: Gauge | CPI/SPI tiles | Milestones (full) ══ */}
       <View style={{flex:5,flexDirection:'row',gap:14}}>
 
         {/* Gauge */}
@@ -554,12 +561,21 @@ function ProjectDashboardTV({p,data,color}:{p:Project;data:SheetData;color:strin
           }}</ChartBox2>
         </Card>
 
-        {/* CPI / SPI needle gauges */}
-        <Card style={{width:190,alignItems:'center',justifyContent:'space-evenly',paddingVertical:16,gap:8}}>
-          <NeedleGauge value={cpi} label="Cost Perf." size={150}/>
-          <View style={{height:1,width:'80%',backgroundColor:D.border}}/>
-          <NeedleGauge value={spi} label="Sched. Perf." size={150}/>
-        </Card>
+        {/* CPI / SPI large tiles */}
+        <View style={{width:160,gap:12}}>
+          <Card style={{flex:1,alignItems:'center',justifyContent:'center',gap:3,
+            backgroundColor:cpi>=1?D.greenDim:D.redDim,borderColor:cpi>=1?D.green:D.red}}>
+            <Text style={{fontSize:11,color:D.sub,letterSpacing:1.5}}>CPI</Text>
+            <Text style={{fontSize:38,fontWeight:'900',color:iCol(D,cpi),lineHeight:41}}>{cpi.toFixed(2)}</Text>
+            <Text style={{fontSize:11,color:iCol(D,cpi),fontWeight:'700'}}>{cpi>=1?'ON BUDGET':'OVER BUDGET'}</Text>
+          </Card>
+          <Card style={{flex:1,alignItems:'center',justifyContent:'center',gap:3,
+            backgroundColor:spi>=1?D.greenDim:D.redDim,borderColor:spi>=1?D.green:D.red}}>
+            <Text style={{fontSize:11,color:D.sub,letterSpacing:1.5}}>SPI</Text>
+            <Text style={{fontSize:38,fontWeight:'900',color:iCol(D,spi),lineHeight:41}}>{spi.toFixed(2)}</Text>
+            <Text style={{fontSize:11,color:iCol(D,spi),fontWeight:'700'}}>{spi>=1?'ON SCHEDULE':'BEHIND'}</Text>
+          </Card>
+        </View>
 
         {/* Milestones — truncated phase list + View all on TV */}
         <Card style={{flex:1.6,padding:18,gap:10}}>
@@ -859,12 +875,10 @@ function ProjectDashboard({p,data,color}:{p:Project;data:SheetData;color:string}
         )}
 
         {/* KPI strip */}
-        <View style={{flexDirection:'row',gap:8}}>
+        <View style={{flexDirection:'row',gap:8,alignItems:'stretch'}}>
           {[
             {l:'Budget', v:fmtM(total), c:D.text},
             {l:'Spent',  v:fmtM(spent), c:bCol, s:fmtP(bPct)+' used'},
-            {l:'CPI',    v:cpi.toFixed(2), c:iCol(D,cpi), s:cpi>=1?'On budget':'Over budget'},
-            {l:'SPI',    v:spi.toFixed(2), c:iCol(D,spi), s:spi>=1?'On schedule':'Behind'},
           ].map(kpi=>(
             <View key={kpi.l} style={{flex:1,backgroundColor:D.bg,borderRadius:8,borderWidth:1,borderColor:D.border,padding:10,alignItems:'center'}}>
               <Text style={{fontSize:9,color:D.muted,letterSpacing:1.5,textTransform:'uppercase',marginBottom:2}}>{kpi.l}</Text>
@@ -872,6 +886,14 @@ function ProjectDashboard({p,data,color}:{p:Project;data:SheetData;color:string}
               {kpi.s&&<Text style={{fontSize:9,color:D.muted,marginTop:1}}>{kpi.s}</Text>}
             </View>
           ))}
+          {/* CPI mini needle */}
+          <View style={{flex:1,backgroundColor:D.bg,borderRadius:8,borderWidth:1,borderColor:D.border,padding:8,alignItems:'center',justifyContent:'center'}}>
+            <NeedleGauge value={cpi} label="CPI" size={80}/>
+          </View>
+          {/* SPI mini needle */}
+          <View style={{flex:1,backgroundColor:D.bg,borderRadius:8,borderWidth:1,borderColor:D.border,padding:8,alignItems:'center',justifyContent:'center'}}>
+            <NeedleGauge value={spi} label="SPI" size={80}/>
+          </View>
         </View>
         {/* Budget progress bar */}
         <View style={{gap:4}}>
@@ -895,12 +917,19 @@ function ProjectDashboard({p,data,color}:{p:Project;data:SheetData;color:string}
           {p.notes&&<Text style={{fontSize:10,color:D.muted,textAlign:'center',lineHeight:15}} numberOfLines={3}>{p.notes}</Text>}
         </Card>
 
-        {/* CPI / SPI needle gauges */}
-        <Card style={{flex:1,minWidth:130,maxWidth:200,padding:16,alignItems:'center',justifyContent:'space-evenly',gap:8}}>
-          <NeedleGauge value={cpi} label="Cost Perf." size={130}/>
-          <View style={{height:1,width:'80%',backgroundColor:D.border}}/>
-          <NeedleGauge value={spi} label="Sched. Perf." size={130}/>
-        </Card>
+        {/* CPI / SPI */}
+        <View style={{flex:1,minWidth:130,maxWidth:180,gap:10}}>
+          <Card style={{flex:1,padding:14,alignItems:'center',justifyContent:'center',gap:3,backgroundColor:cpi>=1?D.greenDim:D.redDim,borderColor:cpi>=1?D.green:D.red}}>
+            <Text style={{fontSize:10,color:D.sub,letterSpacing:1.5}}>COST PERF.</Text>
+            <Text style={{fontSize:38,fontWeight:'900',color:iCol(D,cpi),lineHeight:40}}>{cpi.toFixed(2)}</Text>
+            <Text style={{fontSize:10,color:iCol(D,cpi),fontWeight:'700'}}>{cpi>=1?'ON BUDGET':'OVER BUDGET'}</Text>
+          </Card>
+          <Card style={{flex:1,padding:14,alignItems:'center',justifyContent:'center',gap:3,backgroundColor:spi>=1?D.greenDim:D.redDim,borderColor:spi>=1?D.green:D.red}}>
+            <Text style={{fontSize:10,color:D.sub,letterSpacing:1.5}}>SCHED. PERF.</Text>
+            <Text style={{fontSize:38,fontWeight:'900',color:iCol(D,spi),lineHeight:40}}>{spi.toFixed(2)}</Text>
+            <Text style={{fontSize:10,color:iCol(D,spi),fontWeight:'700'}}>{spi>=1?'ON SCHEDULE':'BEHIND'}</Text>
+          </Card>
+        </View>
 
         {/* Milestones */}
         <Card style={{flex:2,padding:16,gap:14}}>
