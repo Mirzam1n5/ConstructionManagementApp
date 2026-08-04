@@ -102,6 +102,20 @@ function Card({children,style}:{children:React.ReactNode;style?:any}) {
   );
 }
 
+// ── Small labeled stat chip (used in dashboard header) ──────────────
+function Stat({label,value,color}:{label:string;value:string;color?:string}) {
+  const {D} = useTheme();
+  return (
+    <View style={{
+      backgroundColor:D.bg, borderRadius:10, borderWidth:1, borderColor:D.border,
+      paddingHorizontal:13, paddingVertical:7, alignItems:'flex-end', minWidth:74,
+    }}>
+      <Text style={{fontSize:8.5,color:D.muted,letterSpacing:1,textTransform:'uppercase',marginBottom:2}}>{label}</Text>
+      <Text style={{fontSize:14,fontWeight:'800',color:color??D.text}}>{value}</Text>
+    </View>
+  );
+}
+
 function Clock() {
   const {D} = useTheme();
   const [t,setT]=useState(new Date());
@@ -829,9 +843,9 @@ function ProjectDashboard({p,data,color}:{p:Project;data:SheetData;color:string}
     <View style={{gap:14}}>
 
       {/* ══ ROW 1: Header ══ */}
-      <Card style={{borderLeftWidth:5,borderLeftColor:color,padding:20,gap:14}}>
-        {/* Project title row */}
-        <View style={{flexDirection:'row',alignItems:'flex-start',justifyContent:'space-between'}}>
+      <Card style={{borderLeftWidth:5,borderLeftColor:color,padding:20,gap:16}}>
+        {/* Project title row — name on the left, schedule stats + big % on the right */}
+        <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:16}}>
           <View style={{gap:4}}>
             <View style={{flexDirection:'row',alignItems:'center',gap:8}}>
               <View style={{width:8,height:8,borderRadius:4,backgroundColor:sCol(D,p.status)}}/>
@@ -841,38 +855,20 @@ function ProjectDashboard({p,data,color}:{p:Project;data:SheetData;color:string}
             <Text style={{fontSize:26,color:D.text,fontWeight:'900'}}>{p.project_name}</Text>
             <Text style={{fontSize:13,color:D.sub}}>{p.client}  ·  {p.location}</Text>
           </View>
-          <Text style={{fontSize:50,fontWeight:'900',color,lineHeight:52}}>{fmtP(prog)}</Text>
-        </View>
 
-        {/* Schedule info strip */}
-        {(forecastEnd||deviationDays!=null||planPct!=null) && (
-          <View style={{flexDirection:'row',gap:8,flexWrap:'wrap'}}>
-            {startD&&<View style={{backgroundColor:D.bg,borderRadius:8,borderWidth:1,borderColor:D.border,paddingHorizontal:12,paddingVertical:8,alignItems:'center'}}>
-              <Text style={{fontSize:9,color:D.muted,letterSpacing:1,textTransform:'uppercase',marginBottom:2}}>Start Date</Text>
-              <Text style={{fontSize:13,fontWeight:'800',color:D.text}}>{fmtDate(startD)}</Text>
-            </View>}
-            {deviationDays!=null&&<View style={{backgroundColor:D.bg,borderRadius:8,borderWidth:1,borderColor:D.border,paddingHorizontal:12,paddingVertical:8,alignItems:'center'}}>
-              <Text style={{fontSize:9,color:D.muted,letterSpacing:1,textTransform:'uppercase',marginBottom:2}}>Deviation</Text>
-              <Text style={{fontSize:13,fontWeight:'800',color:deviationDays>0?D.red:D.green}}>{deviationDays>0?'+':''}{deviationDays}d</Text>
-            </View>}
-            {forecastEnd&&<View style={{backgroundColor:D.bg,borderRadius:8,borderWidth:1,borderColor:D.border,paddingHorizontal:12,paddingVertical:8,alignItems:'center'}}>
-              <Text style={{fontSize:9,color:D.muted,letterSpacing:1,textTransform:'uppercase',marginBottom:2}}>Forecast End</Text>
-              <Text style={{fontSize:13,fontWeight:'800',color:D.text}}>{forecastEnd}</Text>
-            </View>}
-            {planPct!=null&&<View style={{backgroundColor:D.bg,borderRadius:8,borderWidth:1,borderColor:D.border,paddingHorizontal:12,paddingVertical:8,alignItems:'center'}}>
-              <Text style={{fontSize:9,color:D.muted,letterSpacing:1,textTransform:'uppercase',marginBottom:2}}>Plan %</Text>
-              <Text style={{fontSize:13,fontWeight:'800',color:D.text}}>{fmtP(planPct)}</Text>
-            </View>}
-            {devPct!=null&&<View style={{backgroundColor:D.bg,borderRadius:8,borderWidth:1,borderColor:D.border,paddingHorizontal:12,paddingVertical:8,alignItems:'center'}}>
-              <Text style={{fontSize:9,color:D.muted,letterSpacing:1,textTransform:'uppercase',marginBottom:2}}>Deviation %</Text>
-              <Text style={{fontSize:13,fontWeight:'800',color:devPct<0?D.red:D.green}}>{devPct>0?'+':''}{devPct.toFixed(1)}%</Text>
-            </View>}
-            <View style={{backgroundColor:D.bg,borderRadius:8,borderWidth:1,borderColor:D.border,paddingHorizontal:12,paddingVertical:8,alignItems:'center'}}>
-              <Text style={{fontSize:9,color:D.muted,letterSpacing:1,textTransform:'uppercase',marginBottom:2}}>Fact %</Text>
-              <Text style={{fontSize:13,fontWeight:'800',color:D.text}}>{fmtP(prog)}</Text>
-            </View>
+          <View style={{flexDirection:'row',alignItems:'center',gap:16}}>
+            {(forecastEnd||deviationDays!=null||planPct!=null) && (
+              <View style={{flexDirection:'row',flexWrap:'wrap',gap:8,justifyContent:'flex-end',maxWidth:380}}>
+                {startD&&<Stat label="Start Date" value={fmtDate(startD)}/>}
+                {deviationDays!=null&&<Stat label="Deviation" value={`${deviationDays>0?'+':''}${deviationDays}d`} color={deviationDays>0?D.red:D.green}/>}
+                {forecastEnd&&<Stat label="Forecast End" value={forecastEnd}/>}
+                {planPct!=null&&<Stat label="Plan %" value={fmtP(planPct)}/>}
+                {devPct!=null&&<Stat label="Deviation %" value={`${devPct>0?'+':''}${devPct.toFixed(1)}%`} color={devPct<0?D.red:D.green}/>}
+              </View>
+            )}
+            <Text style={{fontSize:44,fontWeight:'900',color,lineHeight:46}}>{fmtP(prog)}</Text>
           </View>
-        )}
+        </View>
 
         {/* KPI strip */}
         <View style={{flexDirection:'row',gap:8,alignItems:'stretch'}}>
@@ -880,7 +876,7 @@ function ProjectDashboard({p,data,color}:{p:Project;data:SheetData;color:string}
             {l:'Budget', v:fmtM(total), c:D.text},
             {l:'Spent',  v:fmtM(spent), c:bCol, s:fmtP(bPct)+' used'},
           ].map(kpi=>(
-            <View key={kpi.l} style={{flex:1,backgroundColor:D.bg,borderRadius:8,borderWidth:1,borderColor:D.border,padding:10,alignItems:'center'}}>
+            <View key={kpi.l} style={{flex:1,backgroundColor:D.bg,borderRadius:8,borderWidth:1,borderColor:D.border,padding:10,alignItems:'center',justifyContent:'center'}}>
               <Text style={{fontSize:9,color:D.muted,letterSpacing:1.5,textTransform:'uppercase',marginBottom:2}}>{kpi.l}</Text>
               <Text style={{fontSize:19,fontWeight:'900',color:kpi.c,lineHeight:21}}>{kpi.v}</Text>
               {kpi.s&&<Text style={{fontSize:9,color:D.muted,marginTop:1}}>{kpi.s}</Text>}
