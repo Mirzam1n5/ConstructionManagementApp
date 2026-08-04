@@ -493,9 +493,10 @@ function ProjectDashboardTV({p,data,color}:{p:Project;data:SheetData;color:strin
   const fmtDate=(d:Date)=>`${d.getDate().toString().padStart(2,'0')}.${(d.getMonth()+1).toString().padStart(2,'0')}.${d.getFullYear()}`;
   let forecastEnd:string|null=null;
   let deviationDays:number|null=null;
-  if(startD&&endD&&spi>0) {
+  if(startD&&endD) {
     const plannedDays=(endD.getTime()-startD.getTime())/(1000*60*60*24);
-    const forecastDays=plannedDays/spi;
+    // No SPI data yet (project not started / no progress) → best estimate is the planned end date
+    const forecastDays=spi>0?plannedDays/spi:plannedDays;
     const fe=new Date(startD.getTime()+forecastDays*1000*60*60*24);
     forecastEnd=fmtDate(fe);
     deviationDays=Math.round(forecastDays-plannedDays);
@@ -831,9 +832,10 @@ function ProjectDashboard({p,data,color}:{p:Project;data:SheetData;color:string}
   const fmtDate=(d:Date)=>`${d.getDate().toString().padStart(2,'0')}.${(d.getMonth()+1).toString().padStart(2,'0')}.${d.getFullYear()}`;
   let forecastEnd:string|null=null;
   let deviationDays:number|null=null;
-  if(startD&&endD&&spi>0) {
+  if(startD&&endD) {
     const plannedDays=(endD.getTime()-startD.getTime())/(1000*60*60*24);
-    const forecastDays=plannedDays/spi;
+    // No SPI data yet (project not started / no progress) → best estimate is the planned end date
+    const forecastDays=spi>0?plannedDays/spi:plannedDays;
     const fe=new Date(startD.getTime()+forecastDays*1000*60*60*24);
     forecastEnd=fmtDate(fe);
     deviationDays=Math.round(forecastDays-plannedDays);
@@ -864,6 +866,7 @@ function ProjectDashboard({p,data,color}:{p:Project;data:SheetData;color:string}
                 {forecastEnd&&<Stat label="Forecast End" value={forecastEnd}/>}
                 {planPct!=null&&<Stat label="Plan %" value={fmtP(planPct)}/>}
                 {devPct!=null&&<Stat label="Deviation %" value={`${devPct>0?'+':''}${devPct.toFixed(1)}%`} color={devPct<0?D.red:D.green}/>}
+                <Stat label="Fact %" value={fmtP(prog)}/>
               </View>
             )}
             <Text style={{fontSize:44,fontWeight:'900',color,lineHeight:46}}>{fmtP(prog)}</Text>
