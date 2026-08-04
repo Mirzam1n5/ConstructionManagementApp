@@ -175,7 +175,53 @@ function ArcGauge({pct,color,size,label,sublabel}:{pct:number;color:string;size:
   );
 }
 
-// ── Donut ─────────────────────────────────────────────────────────
+// ── Needle Gauge (CPI/SPI thermometer like on paper report) ──────
+function NeedleGauge({value,label,min=0,max=1.5,size=110}:{value:number;label:string;min?:number;max?:number;size?:number}) {
+  const {D} = useTheme();
+  const cx=size/2, cy=size*0.62, r=size*0.38, sw=size*0.10;
+  const toR=(d:number)=>d*Math.PI/180;
+  const apt=(d:number)=>({x:cx+r*Math.cos(toR(d)),y:cy+r*Math.sin(toR(d))});
+  const arc=(f:number,t:number)=>{const s=apt(f),e=apt(t),lg=t-f>180?1:0;return`M${s.x},${s.y} A${r},${r} 0 ${lg} 1 ${e.x},${e.y}`;};
+  // Map value to angle: min→180°, max→360°
+  const ratio=Math.min(1,Math.max(0,(value-min)/(max-min)));
+  const needleAngle=180+180*ratio;
+  const needleLen=r*0.85;
+  const nx=cx+needleLen*Math.cos(toR(needleAngle));
+  const ny=cy+needleLen*Math.sin(toR(needleAngle));
+  // Color zones: red 0-0.8, yellow 0.8-1.0, green 1.0+
+  const zoneRed  =Math.min(1,Math.max(0,(Math.min(value,1.0)-min)/(max-min)));
+  const zoneGreen=Math.min(1,Math.max(0,(value-1.0)/(max-min)));
+  const goodColor = value>=1 ? D.green : value>=0.8 ? D.yellow : D.red;
+  // Tick at 1.0
+  const oneRatio=(1.0-min)/(max-min);
+  const oneAngle=180+180*oneRatio;
+  const t1=apt(oneAngle), t2={x:cx+(r+sw*0.5)*Math.cos(toR(oneAngle)),y:cy+(r+sw*0.5)*Math.sin(toR(oneAngle))};
+  return (
+    <View style={{alignItems:'center',gap:4}}>
+      <Svg width={size} height={size*0.62}>
+        {/* Track segments: red zone, yellow zone, green zone */}
+        <Path d={arc(180,180+180*Math.min(1,(0.8-min)/(max-min)))} fill="none" stroke={D.redDim} strokeWidth={sw} strokeLinecap="round"/>
+        <Path d={arc(180+180*Math.min(1,(0.8-min)/(max-min)),180+180*Math.min(1,(1.0-min)/(max-min)))} fill="none" stroke={D.yellowDim} strokeWidth={sw} strokeLinecap="round"/>
+        <Path d={arc(180+180*Math.min(1,(1.0-min)/(max-min)),360)} fill="none" stroke={D.greenDim} strokeWidth={sw} strokeLinecap="round"/>
+        {/* Filled arc */}
+        {ratio>0.01&&<Path d={arc(180,needleAngle)} fill="none" stroke={goodColor} strokeWidth={sw*0.5} strokeLinecap="round" opacity={0.8}/>}
+        {/* Tick at 1.0 */}
+        <Line x1={t1.x} y1={t1.y} x2={t2.x} y2={t2.y} stroke={D.muted} strokeWidth={1.5}/>
+        {/* Needle */}
+        <Line x1={cx} y1={cy} x2={nx} y2={ny} stroke={goodColor} strokeWidth={2.5} strokeLinecap="round"/>
+        <Circle cx={cx} cy={cy} r={4} fill={goodColor}/>
+        {/* Min/max labels */}
+        <ST x={cx-r+2} y={cy+14} textAnchor="middle" fontSize={size*0.09} fill={D.muted} fontFamily="System">{min}</ST>
+        <ST x={cx+r-2} y={cy+14} textAnchor="middle" fontSize={size*0.09} fill={D.muted} fontFamily="System">{max}</ST>
+        <ST x={cx+(r*0.28)*Math.cos(toR(oneAngle-15))} y={cy+(r*0.28)*Math.sin(toR(oneAngle-15))+r*0.15} textAnchor="middle" fontSize={size*0.09} fill={D.muted} fontFamily="System">1</ST>
+      </Svg>
+      <Text style={{fontSize:size*0.22,fontWeight:'900',color:goodColor,lineHeight:size*0.24}}>{value.toFixed(2)}</Text>
+      <Text style={{fontSize:size*0.09,color:D.muted,letterSpacing:1,textTransform:'uppercase'}}>{label}</Text>
+    </View>
+  );
+}
+
+
 function Donut({slices,size,label,sublabel}:{slices:{v:number;c:string}[];size:number;label?:string;sublabel?:string}) {
   const {D} = useTheme();
   const total=slices.reduce((s,d)=>s+d.v,0)||1;
@@ -422,34 +468,74 @@ function ProjectDashboardTV({p,data,color}:{p:Project;data:SheetData;color:strin
   const msInP =schedule.filter(m=>m.status==='In Progress').length;
   const msDel =schedule.filter(m=>m.status==='Delayed').length;
 
+  // ── Date & schedule calculations ──
+  const parseDate=(s:string)=>{const d=new Date(s);return isNaN(d.getTime())?null:d;};
+  const startD=parseDate(p.start_date), endD=parseDate(p.end_date);
+  const today=new Date();
+  const planPct = startD&&endD&&endD>startD
+    ? Math.min(100,Math.max(0,((today.getTime()-startD.getTime())/(endD.getTime()-startD.getTime()))*100))
+    : null;
+  const devPct = planPct!=null ? prog - planPct : null;
+  const fmtDate=(d:Date)=>`${d.getDate().toString().padStart(2,'0')}.${(d.getMonth()+1).toString().padStart(2,'0')}.${d.getFullYear()}`;
+  let forecastEnd:string|null=null;
+  let deviationDays:number|null=null;
+  if(startD&&endD&&spi>0) {
+    const plannedDays=(endD.getTime()-startD.getTime())/(1000*60*60*24);
+    const forecastDays=plannedDays/spi;
+    const fe=new Date(startD.getTime()+forecastDays*1000*60*60*24);
+    forecastEnd=fmtDate(fe);
+    deviationDays=Math.round(forecastDays-plannedDays);
+  }
+
   return(
     <View style={{flex:1,gap:14}}>
 
       {/* ══ HEADER STRIP ══ */}
-      <Card style={{borderLeftWidth:5,borderLeftColor:color,paddingVertical:14,paddingHorizontal:22,
-        flexDirection:'row',alignItems:'center',gap:18}}>
-        <View style={{gap:2}}>
-          <View style={{flexDirection:'row',alignItems:'center',gap:7}}>
-            <View style={{width:7,height:7,borderRadius:3.5,backgroundColor:sCol(D,p.status)}}/>
-            <Text style={{fontSize:11,color:sCol(D,p.status),fontWeight:'800',letterSpacing:1}}>{p.status.toUpperCase()}</Text>
-          </View>
-          <Text style={{fontSize:23,color:D.text,fontWeight:'900'}}>{p.project_name}</Text>
-          <Text style={{fontSize:12,color:D.sub}}>{p.client} · {p.location}</Text>
-        </View>
-        <View style={{flex:1}}/>
-        <View style={{flexDirection:'row',gap:10}}>
-          {[
-            {l:'Budget',v:fmtM(total),c:D.text},
-            {l:'Spent',v:fmtM(spent),c:bCol,s:fmtP(bPct)},
-            {l:'CPI',v:cpi.toFixed(2),c:iCol(D,cpi)},
-            {l:'SPI',v:spi.toFixed(2),c:iCol(D,spi)},
-          ].map(kpi=>(
-            <View key={kpi.l} style={{backgroundColor:D.bg,borderRadius:12,borderWidth:1,borderColor:D.border,paddingHorizontal:16,paddingVertical:8,alignItems:'center',minWidth:84}}>
-              <Text style={{fontSize:10,color:D.muted,letterSpacing:1,textTransform:'uppercase'}}>{kpi.l}</Text>
-              <Text style={{fontSize:20,fontWeight:'900',color:kpi.c,lineHeight:23}}>{kpi.v}</Text>
-              {kpi.s&&<Text style={{fontSize:10,color:D.muted}}>{kpi.s}</Text>}
+      <Card style={{borderLeftWidth:5,borderLeftColor:color,paddingVertical:14,paddingHorizontal:22,gap:10}}>
+        <View style={{flexDirection:'row',alignItems:'center',gap:18}}>
+          <View style={{gap:2}}>
+            <View style={{flexDirection:'row',alignItems:'center',gap:7}}>
+              <View style={{width:7,height:7,borderRadius:3.5,backgroundColor:sCol(D,p.status)}}/>
+              <Text style={{fontSize:11,color:sCol(D,p.status),fontWeight:'800',letterSpacing:1}}>{p.status.toUpperCase()}</Text>
+              {startD&&endD&&<Text style={{fontSize:11,color:D.muted}}>·  {fmtDate(startD)} → {fmtDate(endD)}</Text>}
             </View>
-          ))}
+            <Text style={{fontSize:23,color:D.text,fontWeight:'900'}}>{p.project_name}</Text>
+            <Text style={{fontSize:12,color:D.sub}}>{p.client} · {p.location}</Text>
+          </View>
+          <View style={{flex:1}}/>
+          {/* Schedule info chips */}
+          <View style={{flexDirection:'row',gap:8}}>
+            {deviationDays!=null&&<View style={{backgroundColor:D.bg,borderRadius:10,borderWidth:1,borderColor:D.border,paddingHorizontal:14,paddingVertical:8,alignItems:'center'}}>
+              <Text style={{fontSize:9,color:D.muted,letterSpacing:1,textTransform:'uppercase'}}>Deviation</Text>
+              <Text style={{fontSize:16,fontWeight:'900',color:deviationDays>0?D.red:D.green}}>{deviationDays>0?'+':''}{deviationDays}d</Text>
+            </View>}
+            {forecastEnd&&<View style={{backgroundColor:D.bg,borderRadius:10,borderWidth:1,borderColor:D.border,paddingHorizontal:14,paddingVertical:8,alignItems:'center'}}>
+              <Text style={{fontSize:9,color:D.muted,letterSpacing:1,textTransform:'uppercase'}}>Forecast End</Text>
+              <Text style={{fontSize:16,fontWeight:'900',color:D.text}}>{forecastEnd}</Text>
+            </View>}
+            {planPct!=null&&<View style={{backgroundColor:D.bg,borderRadius:10,borderWidth:1,borderColor:D.border,paddingHorizontal:14,paddingVertical:8,alignItems:'center'}}>
+              <Text style={{fontSize:9,color:D.muted,letterSpacing:1,textTransform:'uppercase'}}>Plan %</Text>
+              <Text style={{fontSize:16,fontWeight:'900',color:D.text}}>{fmtP(planPct)}</Text>
+            </View>}
+            {devPct!=null&&<View style={{backgroundColor:D.bg,borderRadius:10,borderWidth:1,borderColor:D.border,paddingHorizontal:14,paddingVertical:8,alignItems:'center'}}>
+              <Text style={{fontSize:9,color:D.muted,letterSpacing:1,textTransform:'uppercase'}}>Deviation %</Text>
+              <Text style={{fontSize:16,fontWeight:'900',color:devPct<0?D.red:D.green}}>{devPct>0?'+':''}{devPct.toFixed(1)}%</Text>
+            </View>}
+            <View style={{backgroundColor:D.bg,borderRadius:10,borderWidth:1,borderColor:D.border,paddingHorizontal:14,paddingVertical:8,alignItems:'center'}}>
+              <Text style={{fontSize:9,color:D.muted,letterSpacing:1,textTransform:'uppercase'}}>Fact %</Text>
+              <Text style={{fontSize:16,fontWeight:'900',color:D.text}}>{fmtP(prog)}</Text>
+            </View>
+            {[
+              {l:'Budget',v:fmtM(total),c:D.text},
+              {l:'Spent',v:fmtM(spent),c:bCol,s:fmtP(bPct)},
+            ].map(kpi=>(
+              <View key={kpi.l} style={{backgroundColor:D.bg,borderRadius:10,borderWidth:1,borderColor:D.border,paddingHorizontal:14,paddingVertical:8,alignItems:'center',minWidth:80}}>
+                <Text style={{fontSize:9,color:D.muted,letterSpacing:1,textTransform:'uppercase'}}>{kpi.l}</Text>
+                <Text style={{fontSize:16,fontWeight:'900',color:kpi.c,lineHeight:20}}>{kpi.v}</Text>
+                {kpi.s&&<Text style={{fontSize:9,color:D.muted}}>{kpi.s}</Text>}
+              </View>
+            ))}
+          </View>
         </View>
       </Card>
 
@@ -468,21 +554,12 @@ function ProjectDashboardTV({p,data,color}:{p:Project;data:SheetData;color:strin
           }}</ChartBox2>
         </Card>
 
-        {/* CPI / SPI stacked */}
-        <View style={{width:170,gap:12}}>
-          <Card style={{flex:1,alignItems:'center',justifyContent:'center',gap:3,
-            backgroundColor:cpi>=1?D.greenDim:D.redDim,borderColor:cpi>=1?D.green:D.red}}>
-            <Text style={{fontSize:11,color:D.sub,letterSpacing:1.5}}>CPI</Text>
-            <Text style={{fontSize:38,fontWeight:'900',color:iCol(D,cpi),lineHeight:41}}>{cpi.toFixed(2)}</Text>
-            <Text style={{fontSize:11,color:iCol(D,cpi),fontWeight:'700'}}>{cpi>=1?'ON BUDGET':'OVER BUDGET'}</Text>
-          </Card>
-          <Card style={{flex:1,alignItems:'center',justifyContent:'center',gap:3,
-            backgroundColor:spi>=1?D.greenDim:D.redDim,borderColor:spi>=1?D.green:D.red}}>
-            <Text style={{fontSize:11,color:D.sub,letterSpacing:1.5}}>SPI</Text>
-            <Text style={{fontSize:38,fontWeight:'900',color:iCol(D,spi),lineHeight:41}}>{spi.toFixed(2)}</Text>
-            <Text style={{fontSize:11,color:iCol(D,spi),fontWeight:'700'}}>{spi>=1?'ON SCHEDULE':'BEHIND'}</Text>
-          </Card>
-        </View>
+        {/* CPI / SPI needle gauges */}
+        <Card style={{width:190,alignItems:'center',justifyContent:'space-evenly',paddingVertical:16,gap:8}}>
+          <NeedleGauge value={cpi} label="Cost Perf." size={150}/>
+          <View style={{height:1,width:'80%',backgroundColor:D.border}}/>
+          <NeedleGauge value={spi} label="Sched. Perf." size={150}/>
+        </Card>
 
         {/* Milestones — truncated phase list + View all on TV */}
         <Card style={{flex:1.6,padding:18,gap:10}}>
@@ -710,31 +787,84 @@ function ProjectDashboard({p,data,color}:{p:Project;data:SheetData;color:string}
   const msInP =schedule.filter(m=>m.status==='In Progress').length;
   const msDel =schedule.filter(m=>m.status==='Delayed').length;
 
+  // ── Date & schedule calculations ──
+  const parseDate=(s:string)=>{const d=new Date(s);return isNaN(d.getTime())?null:d;};
+  const startD=parseDate(p.start_date), endD=parseDate(p.end_date);
+  const today=new Date();
+  // Planned % at report date
+  const planPct = startD&&endD&&endD>startD
+    ? Math.min(100,Math.max(0,((today.getTime()-startD.getTime())/(endD.getTime()-startD.getTime()))*100))
+    : null;
+  // Deviation % = fact% - plan%
+  const devPct = planPct!=null ? prog - planPct : null;
+  // Forecast end date based on SPI
+  const fmtDate=(d:Date)=>`${d.getDate().toString().padStart(2,'0')}.${(d.getMonth()+1).toString().padStart(2,'0')}.${d.getFullYear()}`;
+  let forecastEnd:string|null=null;
+  let deviationDays:number|null=null;
+  if(startD&&endD&&spi>0) {
+    const plannedDays=(endD.getTime()-startD.getTime())/(1000*60*60*24);
+    const forecastDays=plannedDays/spi;
+    const fe=new Date(startD.getTime()+forecastDays*1000*60*60*24);
+    forecastEnd=fmtDate(fe);
+    deviationDays=Math.round(forecastDays-plannedDays);
+  }
+
   return(
     <View style={{gap:14}}>
 
       {/* ══ ROW 1: Header ══ */}
-      <Card style={{borderLeftWidth:5,borderLeftColor:color,padding:20,gap:12}}>
+      <Card style={{borderLeftWidth:5,borderLeftColor:color,padding:20,gap:14}}>
+        {/* Project title row */}
         <View style={{flexDirection:'row',alignItems:'flex-start',justifyContent:'space-between'}}>
           <View style={{gap:4}}>
             <View style={{flexDirection:'row',alignItems:'center',gap:8}}>
               <View style={{width:8,height:8,borderRadius:4,backgroundColor:sCol(D,p.status)}}/>
               <Text style={{fontSize:10,color:sCol(D,p.status),fontWeight:'800',letterSpacing:1.5}}>{p.status.toUpperCase()}</Text>
-              <Text style={{fontSize:10,color:D.muted}}>·  {p.start_date} → {p.end_date}</Text>
+              {startD&&endD&&<Text style={{fontSize:10,color:D.muted}}>·  {fmtDate(startD)} → {fmtDate(endD)}</Text>}
             </View>
             <Text style={{fontSize:26,color:D.text,fontWeight:'900'}}>{p.project_name}</Text>
             <Text style={{fontSize:13,color:D.sub}}>{p.client}  ·  {p.location}</Text>
           </View>
           <Text style={{fontSize:50,fontWeight:'900',color,lineHeight:52}}>{fmtP(prog)}</Text>
         </View>
+
+        {/* Schedule info strip */}
+        {(forecastEnd||deviationDays!=null||planPct!=null) && (
+          <View style={{flexDirection:'row',gap:8,flexWrap:'wrap'}}>
+            {startD&&<View style={{backgroundColor:D.bg,borderRadius:8,borderWidth:1,borderColor:D.border,paddingHorizontal:12,paddingVertical:8,alignItems:'center'}}>
+              <Text style={{fontSize:9,color:D.muted,letterSpacing:1,textTransform:'uppercase',marginBottom:2}}>Start Date</Text>
+              <Text style={{fontSize:13,fontWeight:'800',color:D.text}}>{fmtDate(startD)}</Text>
+            </View>}
+            {deviationDays!=null&&<View style={{backgroundColor:D.bg,borderRadius:8,borderWidth:1,borderColor:D.border,paddingHorizontal:12,paddingVertical:8,alignItems:'center'}}>
+              <Text style={{fontSize:9,color:D.muted,letterSpacing:1,textTransform:'uppercase',marginBottom:2}}>Deviation</Text>
+              <Text style={{fontSize:13,fontWeight:'800',color:deviationDays>0?D.red:D.green}}>{deviationDays>0?'+':''}{deviationDays}d</Text>
+            </View>}
+            {forecastEnd&&<View style={{backgroundColor:D.bg,borderRadius:8,borderWidth:1,borderColor:D.border,paddingHorizontal:12,paddingVertical:8,alignItems:'center'}}>
+              <Text style={{fontSize:9,color:D.muted,letterSpacing:1,textTransform:'uppercase',marginBottom:2}}>Forecast End</Text>
+              <Text style={{fontSize:13,fontWeight:'800',color:D.text}}>{forecastEnd}</Text>
+            </View>}
+            {planPct!=null&&<View style={{backgroundColor:D.bg,borderRadius:8,borderWidth:1,borderColor:D.border,paddingHorizontal:12,paddingVertical:8,alignItems:'center'}}>
+              <Text style={{fontSize:9,color:D.muted,letterSpacing:1,textTransform:'uppercase',marginBottom:2}}>Plan %</Text>
+              <Text style={{fontSize:13,fontWeight:'800',color:D.text}}>{fmtP(planPct)}</Text>
+            </View>}
+            {devPct!=null&&<View style={{backgroundColor:D.bg,borderRadius:8,borderWidth:1,borderColor:D.border,paddingHorizontal:12,paddingVertical:8,alignItems:'center'}}>
+              <Text style={{fontSize:9,color:D.muted,letterSpacing:1,textTransform:'uppercase',marginBottom:2}}>Deviation %</Text>
+              <Text style={{fontSize:13,fontWeight:'800',color:devPct<0?D.red:D.green}}>{devPct>0?'+':''}{devPct.toFixed(1)}%</Text>
+            </View>}
+            <View style={{backgroundColor:D.bg,borderRadius:8,borderWidth:1,borderColor:D.border,paddingHorizontal:12,paddingVertical:8,alignItems:'center'}}>
+              <Text style={{fontSize:9,color:D.muted,letterSpacing:1,textTransform:'uppercase',marginBottom:2}}>Fact %</Text>
+              <Text style={{fontSize:13,fontWeight:'800',color:D.text}}>{fmtP(prog)}</Text>
+            </View>
+          </View>
+        )}
+
         {/* KPI strip */}
         <View style={{flexDirection:'row',gap:8}}>
           {[
-            {l:'Budget',   v:fmtM(total),          c:D.text},
-            {l:'Spent',    v:fmtM(spent),           c:bCol,  s:fmtP(bPct)+' used'},
-            {l:'CPI',      v:cpi.toFixed(2),        c:iCol(D,cpi), s:cpi>=1?'On budget':'Over budget'},
-            {l:'SPI',      v:spi.toFixed(2),        c:iCol(D,spi), s:spi>=1?'On schedule':'Behind'},
-
+            {l:'Budget', v:fmtM(total), c:D.text},
+            {l:'Spent',  v:fmtM(spent), c:bCol, s:fmtP(bPct)+' used'},
+            {l:'CPI',    v:cpi.toFixed(2), c:iCol(D,cpi), s:cpi>=1?'On budget':'Over budget'},
+            {l:'SPI',    v:spi.toFixed(2), c:iCol(D,spi), s:spi>=1?'On schedule':'Behind'},
           ].map(kpi=>(
             <View key={kpi.l} style={{flex:1,backgroundColor:D.bg,borderRadius:8,borderWidth:1,borderColor:D.border,padding:10,alignItems:'center'}}>
               <Text style={{fontSize:9,color:D.muted,letterSpacing:1.5,textTransform:'uppercase',marginBottom:2}}>{kpi.l}</Text>
@@ -756,7 +886,7 @@ function ProjectDashboard({p,data,color}:{p:Project;data:SheetData;color:string}
         </View>
       </Card>
 
-      {/* ══ ROW 2: Gauge + CPI/SPI + Milestones + Budget by Category ══ */}
+      {/* ══ ROW 2: Gauge + CPI/SPI needles + Milestones + Budget by Category ══ */}
       <View style={{flexDirection:isNarrow?'column':'row',gap:14}}>
 
         {/* Gauge */}
@@ -765,19 +895,12 @@ function ProjectDashboard({p,data,color}:{p:Project;data:SheetData;color:string}
           {p.notes&&<Text style={{fontSize:10,color:D.muted,textAlign:'center',lineHeight:15}} numberOfLines={3}>{p.notes}</Text>}
         </Card>
 
-        {/* CPI / SPI */}
-        <View style={{flex:1,minWidth:130,maxWidth:180,gap:10}}>
-          <Card style={{flex:1,padding:14,alignItems:'center',justifyContent:'center',gap:3,backgroundColor:cpi>=1?D.greenDim:D.redDim,borderColor:cpi>=1?D.green:D.red}}>
-            <Text style={{fontSize:10,color:D.sub,letterSpacing:1.5}}>COST PERF.</Text>
-            <Text style={{fontSize:38,fontWeight:'900',color:iCol(D,cpi),lineHeight:40}}>{cpi.toFixed(2)}</Text>
-            <Text style={{fontSize:10,color:iCol(D,cpi),fontWeight:'700'}}>{cpi>=1?'ON BUDGET':'OVER BUDGET'}</Text>
-          </Card>
-          <Card style={{flex:1,padding:14,alignItems:'center',justifyContent:'center',gap:3,backgroundColor:spi>=1?D.greenDim:D.redDim,borderColor:spi>=1?D.green:D.red}}>
-            <Text style={{fontSize:10,color:D.sub,letterSpacing:1.5}}>SCHED. PERF.</Text>
-            <Text style={{fontSize:38,fontWeight:'900',color:iCol(D,spi),lineHeight:40}}>{spi.toFixed(2)}</Text>
-            <Text style={{fontSize:10,color:iCol(D,spi),fontWeight:'700'}}>{spi>=1?'ON SCHEDULE':'BEHIND'}</Text>
-          </Card>
-        </View>
+        {/* CPI / SPI needle gauges */}
+        <Card style={{flex:1,minWidth:130,maxWidth:200,padding:16,alignItems:'center',justifyContent:'space-evenly',gap:8}}>
+          <NeedleGauge value={cpi} label="Cost Perf." size={130}/>
+          <View style={{height:1,width:'80%',backgroundColor:D.border}}/>
+          <NeedleGauge value={spi} label="Sched. Perf." size={130}/>
+        </Card>
 
         {/* Milestones */}
         <Card style={{flex:2,padding:16,gap:14}}>

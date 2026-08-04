@@ -135,16 +135,32 @@ function sheetUrl(sheetName: string, sheetId: string): string {
 // same way regardless of how the sheet produced it.
 const GVIZ_DATE_RE = /^Date\((\d+),(\d+),(\d+)(?:,(\d+),(\d+),(\d+))?\)$/;
 
+// Google Sheets set to a locale where the decimal separator is a comma
+// (common in KZ/RU locale settings) sends numeric-looking cells back
+// through gviz as strings like "1,07" instead of "1.07". Number("1,07")
+// is NaN, so every CPI/SPI/budget figure silently broke. We detect the
+// shape "digits , digits" (optionally with thousands separators) and
+// convert it to a normal dot-decimal string before anything else sees it.
+const COMMA_DECIMAL_RE = /^-?\d{1,3}(?:[ .]\d{3})*,\d+$|^-?\d+,\d+$/;
+
 function normalizeCellValue(value: any): any {
   if (typeof value !== 'string') return value;
-  const m = value.match(GVIZ_DATE_RE);
-  if (!m) return value;
-  const [, y, mo, d] = m;
-  const year = Number(y);
-  const month = Number(mo) + 1; // gviz months are 0-indexed
-  const day = Number(d);
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${year}-${pad(month)}-${pad(day)}`;
+  const dateMatch = value.match(GVIZ_DATE_RE);
+  if (dateMatch) {
+    const [, y, mo, d] = dateMatch;
+    const year = Number(y);
+    const month = Number(mo) + 1; // gviz months are 0-indexed
+    const day = Number(d);
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${year}-${pad(month)}-${pad(day)}`;
+  }
+  if (COMMA_DECIMAL_RE.test(value.trim())) {
+    // Strip any thousands separators (space or dot) before the comma,
+    // then swap the decimal comma for a dot.
+    const normalized = value.trim().replace(/[ .](?=\d{3},)/g, '').replace(',', '.');
+    return normalized;
+  }
+  return value;
 }
 
 async function fetchSheet<T>(sheetName: string, sheetId: string): Promise<T[]> {
