@@ -17,6 +17,10 @@ export interface Project {
   cpi: number;
   spi: number;
   notes: string;
+  // New deviation fields
+  cost_variance_usd: number;
+  schedule_variance_days: number;
+  deviation_status: string;
 }
 
 export interface Worker {
@@ -126,48 +130,10 @@ function sheetUrl(sheetName: string, sheetId: string): string {
   return `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&sheet=${encoded}`;
 }
 
-// Google's gviz API returns date/datetime cells as the literal string
-// "Date(2026,0,1)" (year, zero-indexed month, day[, h, m, s]) instead of
-// a normal date string — this happens especially often when the cell's
-// value comes from a formula like IMPORTRANGE/QUERY rather than being
-// typed in directly. We detect that shape and convert it to a clean
-// "YYYY-MM-DD" string so the rest of the app can treat every date the
-// same way regardless of how the sheet produced it.
-const GVIZ_DATE_RE = /^Date\((\d+),(\d+),(\d+)(?:,(\d+),(\d+),(\d+))?\)$/;
-
-// Google Sheets set to a locale where the decimal separator is a comma
-// (common in KZ/RU locale settings) sends numeric-looking cells back
-// through gviz as strings like "1,07" instead of "1.07". Number("1,07")
-// is NaN, so every CPI/SPI/budget figure silently broke. We detect the
-// shape "digits , digits" (optionally with thousands separators) and
-// convert it to a normal dot-decimal string before anything else sees it.
-const COMMA_DECIMAL_RE = /^-?\d{1,3}(?:[ .]\d{3})*,\d+$|^-?\d+,\d+$/;
-
-function normalizeCellValue(value: any): any {
-  if (typeof value !== 'string') return value;
-  const dateMatch = value.match(GVIZ_DATE_RE);
-  if (dateMatch) {
-    const [, y, mo, d] = dateMatch;
-    const year = Number(y);
-    const month = Number(mo) + 1; // gviz months are 0-indexed
-    const day = Number(d);
-    const pad = (n: number) => String(n).padStart(2, '0');
-    return `${year}-${pad(month)}-${pad(day)}`;
-  }
-  if (COMMA_DECIMAL_RE.test(value.trim())) {
-    // Strip any thousands separators (space or dot) before the comma,
-    // then swap the decimal comma for a dot.
-    const normalized = value.trim().replace(/[ .](?=\d{3},)/g, '').replace(',', '.');
-    return normalized;
-  }
-  return value;
-}
-
 async function fetchSheet<T>(sheetName: string, sheetId: string): Promise<T[]> {
   const url = sheetUrl(sheetName, sheetId);
   const res = await fetch(url);
   const text = await res.text();
-  // Google wraps response in /*O_o*/\ngoogle.visualization.Query.setResponse({...});
   const json = JSON.parse(text.substring(47, text.length - 2));
   const cols: string[] = json.table.cols.map((c: any) => c.label as string);
   const rows: T[] = json.table.rows
@@ -176,7 +142,7 @@ async function fetchSheet<T>(sheetName: string, sheetId: string): Promise<T[]> {
       const obj: Record<string, any> = {};
       cols.forEach((col, i) => {
         const cell = row.c[i];
-        obj[col] = cell ? normalizeCellValue(cell.v ?? '') : '';
+        obj[col] = cell ? (cell.v ?? '') : '';
       });
       return obj as T;
     });
@@ -184,10 +150,6 @@ async function fetchSheet<T>(sheetName: string, sheetId: string): Promise<T[]> {
 }
 
 // ─── Main hook ───────────────────────────────────────────────────
-// No sheet ID is hardcoded anywhere in this file. The caller must pass
-// an explicit sheetId (usually the one the user picked/added in the UI).
-// When no sheetId is given, the hook simply returns no data — there is
-// nothing baked into source control for it to fall back to.
 export function useSheetData(sheetId?: string) {
   const [data, setData] = useState<SheetData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -214,7 +176,25 @@ export function useSheetData(sheetId?: string) {
           fetchSheet<Issue>('Issues', sheetId),
           fetchSheet<DailyReport>('Daily Reports', sheetId),
         ]);
-      setData({ projects, workers, equipment, budget, schedule, evm, issues, dailyReports });
+      
+      // Ensure deviation fields have defaults
+      const projectsWithDefaults = projects.map(p => ({
+        ...p,
+        cost_variance_usd: p.cost_variance_usd ?? 0,
+        schedule_variance_days: p.schedule_variance_days ?? 0,
+        deviation_status: p.deviation_status ?? 'Unknown',
+      }));
+
+      setData({ 
+        projects: projectsWithDefaults, 
+        workers, 
+        equipment, 
+        budget, 
+        schedule, 
+        evm, 
+        issues, 
+        dailyReports 
+      });
     } catch (e: any) {
       setError(e?.message ?? 'Failed to load data');
     } finally {
