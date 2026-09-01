@@ -528,22 +528,17 @@ function ProjectDashboardTV({p,data,color}:{p:Project;data:SheetData;color:strin
   const planPct = startD&&endD&&endD>startD
     ? Math.min(100,Math.max(0,((today.getTime()-startD.getTime())/(endD.getTime()-startD.getTime()))*100))
     : null;
-  // Use real deviation data from project, fallback to SPI calculation
-  const deviationDays = p.schedule_variance_days ?? null;
-  let forecastEnd:string|null=null;
+  const devPct = planPct!=null ? prog - planPct : null;
   const fmtDate=(d:Date)=>`${d.getDate().toString().padStart(2,'0')}.${(d.getMonth()+1).toString().padStart(2,'0')}.${d.getFullYear()}`;
-  
+  let forecastEnd:string|null=null;
+  let deviationDays:number|null=null;
   if(startD&&endD) {
-    let daysDeviation = deviationDays;
-    // Fallback: calculate from SPI if no real deviation data
-    if(daysDeviation === null) {
-      const plannedDays=(endD.getTime()-startD.getTime())/(1000*60*60*24);
-      const forecastDays=spi>0?plannedDays/spi:plannedDays;
-      daysDeviation=Math.round(forecastDays-plannedDays);
-    }
-    // Calculate forecast end = planned end + deviation
-    const fe=new Date(endD.getTime()+daysDeviation*1000*60*60*24);
+    const plannedDays=(endD.getTime()-startD.getTime())/(1000*60*60*24);
+    // No SPI data yet (project not started / no progress) → best estimate is the planned end date
+    const forecastDays=spi>0?plannedDays/spi:plannedDays;
+    const fe=new Date(startD.getTime()+forecastDays*1000*60*60*24);
     forecastEnd=fmtDate(fe);
+    deviationDays=Math.round(forecastDays-plannedDays);
   }
 
   return(
@@ -568,8 +563,8 @@ function ProjectDashboardTV({p,data,color}:{p:Project;data:SheetData;color:strin
             <GroupLabel>Schedule</GroupLabel>
             <View style={{flexDirection:'row',gap:8}}>
               {forecastEnd&&<Stat size="lg" label="Forecast End" value={forecastEnd}
-                sub={deviationDays!=null?`${deviationDays>0?'+':''}${deviationDays}d vs plan`:undefined}
-                subColor={deviationDays!=null?(deviationDays>0?D.red:D.green):undefined}/>}
+                sub={`${(deviationDays??0)>0?'+':''}${deviationDays??0}d vs plan`}
+                subColor={(deviationDays??0)>0?D.red:D.green}/>}
               {planPct!=null&&<Stat size="lg" label="Plan → Fact" value={`${fmtP(planPct)} → ${fmtP(prog)}`}
                 sub={devPct!=null?`${devPct>0?'+':''}${devPct.toFixed(1)}%`:undefined}
                 subColor={devPct!=null?(devPct<0?D.red:D.green):undefined}/>}
@@ -584,7 +579,6 @@ function ProjectDashboardTV({p,data,color}:{p:Project;data:SheetData;color:strin
             <View style={{flexDirection:'row',gap:8}}>
               <Stat size="lg" label="Budget" value={fmtM(total)}/>
               <Stat size="lg" label="Spent" value={fmtM(spent)} color={bCol} sub={fmtP(bPct)+' used'}/>
-              <Stat size="lg" label="Variance" value={fmtM(p.cost_variance_usd ?? 0)} color={(p.cost_variance_usd ?? 0) > 0 ? D.red : D.green} sub={(p.cost_variance_usd ?? 0) > 0 ? 'over budget' : 'under budget'}/>
             </View>
           </View>
 
@@ -872,24 +866,17 @@ function ProjectDashboard({p,data,color}:{p:Project;data:SheetData;color:string}
     : null;
   // Deviation % = fact% - plan%
   const devPct = planPct!=null ? prog - planPct : null;
-  // Forecast end date based on real deviation data or SPI fallback
+  // Forecast end date based on SPI
   const fmtDate=(d:Date)=>`${d.getDate().toString().padStart(2,'0')}.${(d.getMonth()+1).toString().padStart(2,'0')}.${d.getFullYear()}`;
   let forecastEnd:string|null=null;
   let deviationDays:number|null=null;
-  
   if(startD&&endD) {
-    // Use real deviation data from project if available
-    let daysDeviation = p.schedule_variance_days ?? null;
-    // Fallback: calculate from SPI if no real deviation data
-    if(daysDeviation === null) {
-      const plannedDays=(endD.getTime()-startD.getTime())/(1000*60*60*24);
-      const forecastDays=spi>0?plannedDays/spi:plannedDays;
-      daysDeviation=Math.round(forecastDays-plannedDays);
-    }
-    deviationDays = daysDeviation;
-    // Calculate forecast end = planned end + deviation
-    const fe=new Date(endD.getTime()+deviationDays*1000*60*60*24);
+    const plannedDays=(endD.getTime()-startD.getTime())/(1000*60*60*24);
+    // No SPI data yet (project not started / no progress) → best estimate is the planned end date
+    const forecastDays=spi>0?plannedDays/spi:plannedDays;
+    const fe=new Date(startD.getTime()+forecastDays*1000*60*60*24);
     forecastEnd=fmtDate(fe);
+    deviationDays=Math.round(forecastDays-plannedDays);
   }
 
   return(
@@ -912,11 +899,11 @@ function ProjectDashboard({p,data,color}:{p:Project;data:SheetData;color:string}
           <View style={{flexDirection:'row',alignItems:'center',gap:16}}>
             {(
               <View style={{flexDirection:'row',flexWrap:'wrap',gap:8,justifyContent:'flex-end',maxWidth:380}}>
-                {startD&&<Stat label="Start Date" value={fmtDate(startD)}/>}
-                <Stat label="Deviation" value={`${deviationDays!=null?(deviationDays>0?'+':'')+(deviationDays):"0"}d`} color={deviationDays!=null?(deviationDays>0?D.red:D.green):D.sub}/>
-                {forecastEnd&&<Stat label="Forecast End" value={forecastEnd}/>}
-                {planPct!=null&&<Stat label="Plan %" value={fmtP(planPct)}/>}
-                <Stat label="Deviation %" value={`${devPct!=null?(devPct>0?'+':'')+(devPct.toFixed(1)):'0'}%`} color={devPct!=null?(devPct<0?D.red:D.green):D.sub}/>
+                <Stat label="Start Date" value={startD?fmtDate(startD):"-"}/>
+                <Stat label="Deviation" value={`${(deviationDays??0)>0?'+':''}${deviationDays??0}d`} color={(deviationDays??0)>0?D.red:D.green}/>
+                <Stat label="Forecast End" value={forecastEnd??"-"}/>
+                <Stat label="Plan %" value={planPct!=null?fmtP(planPct):"-"}/>
+                <Stat label="Deviation %" value={`${(devPct??0)>0?'+':''}${(devPct??0).toFixed(1)}%`} color={(devPct??0)<0?D.red:D.green}/>
                 <Stat label="Fact %" value={fmtP(prog)}/>
               </View>
             )}
@@ -929,7 +916,6 @@ function ProjectDashboard({p,data,color}:{p:Project;data:SheetData;color:string}
           {[
             {l:'Budget', v:fmtM(total), c:D.text},
             {l:'Spent',  v:fmtM(spent), c:bCol, s:fmtP(bPct)+' used'},
-            {l:'Variance', v:fmtM(p.cost_variance_usd ?? 0), c:(p.cost_variance_usd ?? 0) > 0 ? D.red : D.green, s:(p.cost_variance_usd ?? 0) > 0 ? 'over' : 'under'},
           ].map(kpi=>(
             <View key={kpi.l} style={{flex:1,backgroundColor:D.bg,borderRadius:8,borderWidth:1,borderColor:D.border,padding:10,alignItems:'center',justifyContent:'center'}}>
               <Text style={{fontSize:9,color:D.muted,letterSpacing:1.5,textTransform:'uppercase',marginBottom:2}}>{kpi.l}</Text>
