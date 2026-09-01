@@ -584,7 +584,7 @@ function ProjectDashboardTV({p,data,color}:{p:Project;data:SheetData;color:strin
             <View style={{flexDirection:'row',gap:8}}>
               <Stat size="lg" label="Budget" value={fmtM(total)}/>
               <Stat size="lg" label="Spent" value={fmtM(spent)} color={bCol} sub={fmtP(bPct)+' used'}/>
-              {p.cost_variance_usd !== undefined && <Stat size="lg" label="Variance" value={fmtM(p.cost_variance_usd ?? 0)} color={(p.cost_variance_usd ?? 0) > 0 ? D.red : D.green} sub={(p.cost_variance_usd ?? 0) > 0 ? 'over budget' : 'under budget'}/>}
+              <Stat size="lg" label="Variance" value={fmtM(p.cost_variance_usd ?? 0)} color={(p.cost_variance_usd ?? 0) > 0 ? D.red : D.green} sub={(p.cost_variance_usd ?? 0) > 0 ? 'over budget' : 'under budget'}/>
             </View>
           </View>
 
@@ -929,7 +929,7 @@ function ProjectDashboard({p,data,color}:{p:Project;data:SheetData;color:string}
           {[
             {l:'Budget', v:fmtM(total), c:D.text},
             {l:'Spent',  v:fmtM(spent), c:bCol, s:fmtP(bPct)+' used'},
-            ...(p.cost_variance_usd !== undefined ? [{l:'Variance', v:fmtM(p.cost_variance_usd ?? 0), c:(p.cost_variance_usd ?? 0) > 0 ? D.red : D.green, s:(p.cost_variance_usd ?? 0) > 0 ? 'over' : 'under'}] : []),
+            {l:'Variance', v:fmtM(p.cost_variance_usd ?? 0), c:(p.cost_variance_usd ?? 0) > 0 ? D.red : D.green, s:(p.cost_variance_usd ?? 0) > 0 ? 'over' : 'under'},
           ].map(kpi=>(
             <View key={kpi.l} style={{flex:1,backgroundColor:D.bg,borderRadius:8,borderWidth:1,borderColor:D.border,padding:10,alignItems:'center',justifyContent:'center'}}>
               <Text style={{fontSize:9,color:D.muted,letterSpacing:1.5,textTransform:'uppercase',marginBottom:2}}>{kpi.l}</Text>
