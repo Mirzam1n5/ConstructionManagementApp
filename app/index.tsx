@@ -1,11 +1,12 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, Platform, useWindowDimensions, ScrollView, TouchableOpacity, TextInput, Pressable } from 'react-native';
+import { View, Text, Platform, useWindowDimensions, ScrollView, TouchableOpacity, TextInput, Pressable, Image } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useRouter, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Path, Circle, G, Text as ST, Line, Rect, Defs, LinearGradient, Stop } from 'react-native-svg';
 import { useSheetData, SheetData, Project, Worker, BudgetRow, Milestone, EvmRow, Issue } from '../hooks/useSheetData';
 import { ThemeContext, useTheme, usePersistedTheme, DARK, LIGHT, type Palette } from '../hooks/useTheme';
+import { getJSON, setJSON } from '../hooks/useStorage';
 
 // ── API base URL ────────────────────────────────────────────────────
 const API_BASE = 'https://isker-app.onrender.com';
@@ -30,6 +31,30 @@ async function clearToken() {
 function authHeaders(token: string) {
   return { 'Content-Type': 'application/json', 'x-isker-token': token };
 }
+// ── Logo component ──────────────────────────────────────────────────
+// Displays logo.png (horizontal 810×220) with adaptive sizing for mobile and web
+// Maintains 3.68:1 aspect ratio
+function Logo({size='default'}:{size?:'small'|'default'|'large'}) {
+  const sizeMap = {
+    small:   { h: 24, w: 88 },    // For mobile header
+    default: { h: 32, w: 118 },   // For web tab bar
+    large:   { h: 56, w: 206 },   // For login/empty state
+  };
+  const s = sizeMap[size];
+  return Platform.OS === 'web' ? (
+    <img 
+      src={require('../assets/iskerlogo.png')} 
+      style={{width: s.w, height: s.h, objectFit: 'contain', display: 'block'}} 
+      alt="ISKER Logo" 
+    />
+  ) : (
+    <Image 
+      source={require('../assets/iskerlogo.png')} 
+      style={{width: s.w, height: s.h, resizeMode: 'contain'}} 
+    />
+  );
+}
+
 
 function useAuth() {
   const [token, setToken] = useState<string | null>(null);
@@ -102,18 +127,32 @@ function Card({children,style}:{children:React.ReactNode;style?:any}) {
   );
 }
 
-// ── Small labeled stat chip (used in dashboard header) ──────────────
-function Stat({label,value,color}:{label:string;value:string;color?:string}) {
+// ── Small labeled stat chip (used in dashboard headers) ─────────────
+function Stat({label,value,color,sub,subColor,size='sm'}:{label:string;value:string;color?:string;sub?:string;subColor?:string;size?:'sm'|'lg'}) {
   const {D} = useTheme();
+  const big = size==='lg';
   return (
     <View style={{
       backgroundColor:D.bg, borderRadius:10, borderWidth:1, borderColor:D.border,
-      paddingHorizontal:13, paddingVertical:7, alignItems:'flex-end', minWidth:74,
+      paddingHorizontal:big?14:13, paddingVertical:big?8:7, alignItems:'flex-end', minWidth:big?84:74,
     }}>
-      <Text style={{fontSize:8.5,color:D.muted,letterSpacing:1,textTransform:'uppercase',marginBottom:2}}>{label}</Text>
-      <Text style={{fontSize:14,fontWeight:'800',color:color??D.text}}>{value}</Text>
+      <Text style={{fontSize:big?9:8.5,color:D.muted,letterSpacing:1,textTransform:'uppercase',marginBottom:2}}>{label}</Text>
+      <Text style={{fontSize:big?16:14,fontWeight:'900',color:color??D.text}}>{value}</Text>
+      {sub&&<Text style={{fontSize:big?10:9,fontWeight:'700',color:subColor??D.muted,marginTop:1}}>{sub}</Text>}
     </View>
   );
+}
+
+// ── Vertical divider between header stat groups ──────────────────────
+function VDivider() {
+  const {D} = useTheme();
+  return <View style={{width:1,alignSelf:'stretch',backgroundColor:D.border,marginVertical:2}}/>;
+}
+
+// ── Small uppercase label above a group of header stats ─────────────
+function GroupLabel({children}:{children:React.ReactNode}) {
+  const {D} = useTheme();
+  return <Text style={{fontSize:8,color:D.muted,letterSpacing:1.5,fontWeight:'800',marginBottom:5}}>{children}</Text>;
 }
 
 function Clock() {
@@ -489,17 +528,22 @@ function ProjectDashboardTV({p,data,color}:{p:Project;data:SheetData;color:strin
   const planPct = startD&&endD&&endD>startD
     ? Math.min(100,Math.max(0,((today.getTime()-startD.getTime())/(endD.getTime()-startD.getTime()))*100))
     : null;
-  const devPct = planPct!=null ? prog - planPct : null;
-  const fmtDate=(d:Date)=>`${d.getDate().toString().padStart(2,'0')}.${(d.getMonth()+1).toString().padStart(2,'0')}.${d.getFullYear()}`;
+  // Use real deviation data from project, fallback to SPI calculation
+  const deviationDays = p.schedule_variance_days ?? null;
   let forecastEnd:string|null=null;
-  let deviationDays:number|null=null;
+  const fmtDate=(d:Date)=>`${d.getDate().toString().padStart(2,'0')}.${(d.getMonth()+1).toString().padStart(2,'0')}.${d.getFullYear()}`;
+  
   if(startD&&endD) {
-    const plannedDays=(endD.getTime()-startD.getTime())/(1000*60*60*24);
-    // No SPI data yet (project not started / no progress) → best estimate is the planned end date
-    const forecastDays=spi>0?plannedDays/spi:plannedDays;
-    const fe=new Date(startD.getTime()+forecastDays*1000*60*60*24);
+    let daysDeviation = deviationDays;
+    // Fallback: calculate from SPI if no real deviation data
+    if(daysDeviation === null) {
+      const plannedDays=(endD.getTime()-startD.getTime())/(1000*60*60*24);
+      const forecastDays=spi>0?plannedDays/spi:plannedDays;
+      daysDeviation=Math.round(forecastDays-plannedDays);
+    }
+    // Calculate forecast end = planned end + deviation
+    const fe=new Date(endD.getTime()+daysDeviation*1000*60*60*24);
     forecastEnd=fmtDate(fe);
-    deviationDays=Math.round(forecastDays-plannedDays);
   }
 
   return(
@@ -518,44 +562,44 @@ function ProjectDashboardTV({p,data,color}:{p:Project;data:SheetData;color:strin
             <Text style={{fontSize:12,color:D.sub}}>{p.client} · {p.location}</Text>
           </View>
           <View style={{flex:1}}/>
-          {/* Schedule info chips */}
-          <View style={{flexDirection:'row',gap:8}}>
-            {deviationDays!=null&&<View style={{backgroundColor:D.bg,borderRadius:10,borderWidth:1,borderColor:D.border,paddingHorizontal:14,paddingVertical:8,alignItems:'center'}}>
-              <Text style={{fontSize:9,color:D.muted,letterSpacing:1,textTransform:'uppercase'}}>Deviation</Text>
-              <Text style={{fontSize:16,fontWeight:'900',color:deviationDays>0?D.red:D.green}}>{deviationDays>0?'+':''}{deviationDays}d</Text>
-            </View>}
-            {forecastEnd&&<View style={{backgroundColor:D.bg,borderRadius:10,borderWidth:1,borderColor:D.border,paddingHorizontal:14,paddingVertical:8,alignItems:'center'}}>
-              <Text style={{fontSize:9,color:D.muted,letterSpacing:1,textTransform:'uppercase'}}>Forecast End</Text>
-              <Text style={{fontSize:16,fontWeight:'900',color:D.text}}>{forecastEnd}</Text>
-            </View>}
-            {planPct!=null&&<View style={{backgroundColor:D.bg,borderRadius:10,borderWidth:1,borderColor:D.border,paddingHorizontal:14,paddingVertical:8,alignItems:'center'}}>
-              <Text style={{fontSize:9,color:D.muted,letterSpacing:1,textTransform:'uppercase'}}>Plan %</Text>
-              <Text style={{fontSize:16,fontWeight:'900',color:D.text}}>{fmtP(planPct)}</Text>
-            </View>}
-            {devPct!=null&&<View style={{backgroundColor:D.bg,borderRadius:10,borderWidth:1,borderColor:D.border,paddingHorizontal:14,paddingVertical:8,alignItems:'center'}}>
-              <Text style={{fontSize:9,color:D.muted,letterSpacing:1,textTransform:'uppercase'}}>Deviation %</Text>
-              <Text style={{fontSize:16,fontWeight:'900',color:devPct<0?D.red:D.green}}>{devPct>0?'+':''}{devPct.toFixed(1)}%</Text>
-            </View>}
-            <View style={{backgroundColor:D.bg,borderRadius:10,borderWidth:1,borderColor:D.border,paddingHorizontal:14,paddingVertical:8,alignItems:'center'}}>
-              <Text style={{fontSize:9,color:D.muted,letterSpacing:1,textTransform:'uppercase'}}>Fact %</Text>
-              <Text style={{fontSize:16,fontWeight:'900',color:D.text}}>{fmtP(prog)}</Text>
+
+          {/* Schedule group */}
+          <View>
+            <GroupLabel>Schedule</GroupLabel>
+            <View style={{flexDirection:'row',gap:8}}>
+              {forecastEnd&&<Stat size="lg" label="Forecast End" value={forecastEnd}
+                sub={deviationDays!=null?`${deviationDays>0?'+':''}${deviationDays}d vs plan`:undefined}
+                subColor={deviationDays!=null?(deviationDays>0?D.red:D.green):undefined}/>}
+              {planPct!=null&&<Stat size="lg" label="Plan → Fact" value={`${fmtP(planPct)} → ${fmtP(prog)}`}
+                sub={devPct!=null?`${devPct>0?'+':''}${devPct.toFixed(1)}%`:undefined}
+                subColor={devPct!=null?(devPct<0?D.red:D.green):undefined}/>}
             </View>
-            {[
-              {l:'Budget',v:fmtM(total),c:D.text},
-              {l:'Spent',v:fmtM(spent),c:bCol,s:fmtP(bPct)},
-            ].map(kpi=>(
-              <View key={kpi.l} style={{backgroundColor:D.bg,borderRadius:10,borderWidth:1,borderColor:D.border,paddingHorizontal:14,paddingVertical:8,alignItems:'center',minWidth:80}}>
-                <Text style={{fontSize:9,color:D.muted,letterSpacing:1,textTransform:'uppercase'}}>{kpi.l}</Text>
-                <Text style={{fontSize:16,fontWeight:'900',color:kpi.c,lineHeight:20}}>{kpi.v}</Text>
-                {kpi.s&&<Text style={{fontSize:9,color:D.muted}}>{kpi.s}</Text>}
+          </View>
+
+          <VDivider/>
+
+          {/* Budget group */}
+          <View>
+            <GroupLabel>Budget</GroupLabel>
+            <View style={{flexDirection:'row',gap:8}}>
+              <Stat size="lg" label="Budget" value={fmtM(total)}/>
+              <Stat size="lg" label="Spent" value={fmtM(spent)} color={bCol} sub={fmtP(bPct)+' used'}/>
+              {p.cost_variance_usd !== undefined && <Stat size="lg" label="Variance" value={fmtM(p.cost_variance_usd ?? 0)} color={(p.cost_variance_usd ?? 0) > 0 ? D.red : D.green} sub={(p.cost_variance_usd ?? 0) > 0 ? 'over budget' : 'under budget'}/>}
+            </View>
+          </View>
+
+          <VDivider/>
+
+          {/* Index group */}
+          <View>
+            <GroupLabel>Index</GroupLabel>
+            <View style={{flexDirection:'row',gap:8}}>
+              <View style={{backgroundColor:D.bg,borderRadius:10,borderWidth:1,borderColor:D.border,padding:6,alignItems:'center'}}>
+                <NeedleGauge value={cpi} label="CPI" size={72}/>
               </View>
-            ))}
-            {/* CPI/SPI mini needles in header */}
-            <View style={{backgroundColor:D.bg,borderRadius:10,borderWidth:1,borderColor:D.border,padding:6,alignItems:'center'}}>
-              <NeedleGauge value={cpi} label="CPI" size={72}/>
-            </View>
-            <View style={{backgroundColor:D.bg,borderRadius:10,borderWidth:1,borderColor:D.border,padding:6,alignItems:'center'}}>
-              <NeedleGauge value={spi} label="SPI" size={72}/>
+              <View style={{backgroundColor:D.bg,borderRadius:10,borderWidth:1,borderColor:D.border,padding:6,alignItems:'center'}}>
+                <NeedleGauge value={spi} label="SPI" size={72}/>
+              </View>
             </View>
           </View>
         </View>
@@ -828,17 +872,24 @@ function ProjectDashboard({p,data,color}:{p:Project;data:SheetData;color:string}
     : null;
   // Deviation % = fact% - plan%
   const devPct = planPct!=null ? prog - planPct : null;
-  // Forecast end date based on SPI
+  // Forecast end date based on real deviation data or SPI fallback
   const fmtDate=(d:Date)=>`${d.getDate().toString().padStart(2,'0')}.${(d.getMonth()+1).toString().padStart(2,'0')}.${d.getFullYear()}`;
   let forecastEnd:string|null=null;
   let deviationDays:number|null=null;
+  
   if(startD&&endD) {
-    const plannedDays=(endD.getTime()-startD.getTime())/(1000*60*60*24);
-    // No SPI data yet (project not started / no progress) → best estimate is the planned end date
-    const forecastDays=spi>0?plannedDays/spi:plannedDays;
-    const fe=new Date(startD.getTime()+forecastDays*1000*60*60*24);
+    // Use real deviation data from project if available
+    let daysDeviation = p.schedule_variance_days ?? null;
+    // Fallback: calculate from SPI if no real deviation data
+    if(daysDeviation === null) {
+      const plannedDays=(endD.getTime()-startD.getTime())/(1000*60*60*24);
+      const forecastDays=spi>0?plannedDays/spi:plannedDays;
+      daysDeviation=Math.round(forecastDays-plannedDays);
+    }
+    deviationDays = daysDeviation;
+    // Calculate forecast end = planned end + deviation
+    const fe=new Date(endD.getTime()+deviationDays*1000*60*60*24);
     forecastEnd=fmtDate(fe);
-    deviationDays=Math.round(forecastDays-plannedDays);
   }
 
   return(
@@ -878,6 +929,7 @@ function ProjectDashboard({p,data,color}:{p:Project;data:SheetData;color:string}
           {[
             {l:'Budget', v:fmtM(total), c:D.text},
             {l:'Spent',  v:fmtM(spent), c:bCol, s:fmtP(bPct)+' used'},
+            ...(p.cost_variance_usd !== undefined ? [{l:'Variance', v:fmtM(p.cost_variance_usd ?? 0), c:(p.cost_variance_usd ?? 0) > 0 ? D.red : D.green, s:(p.cost_variance_usd ?? 0) > 0 ? 'over' : 'under'}] : []),
           ].map(kpi=>(
             <View key={kpi.l} style={{flex:1,backgroundColor:D.bg,borderRadius:8,borderWidth:1,borderColor:D.border,padding:10,alignItems:'center',justifyContent:'center'}}>
               <Text style={{fontSize:9,color:D.muted,letterSpacing:1.5,textTransform:'uppercase',marginBottom:2}}>{kpi.l}</Text>
@@ -1101,7 +1153,9 @@ function LoginScreen({onLogin}:{onLogin:(pw:string)=>Promise<boolean>}) {
   return (
     <View style={{flex:1,backgroundColor:D.bg,alignItems:'center',justifyContent:'center',padding:32}}>
       <Stack.Screen options={{headerShown:false}}/>
-      <Text style={{color:D.text,fontSize:28,fontWeight:'900',letterSpacing:3,marginBottom:4}}>ISKER</Text>
+      <View style={{marginBottom:32}}>
+        <Logo size="large"/>
+      </View>
       <Text style={{color:D.muted,fontSize:11,letterSpacing:2,marginBottom:48}}>CONSTRUCTION TRACKER</Text>
 
       <View style={{width:'100%',maxWidth:360,gap:12}}>
@@ -1394,7 +1448,12 @@ function WebLayout({sheets,setSheets,token}:{sheets:SheetEntry[];setSheets:(s:Sh
       {/* Tab bar */}
       <View style={{backgroundColor:D.panel,borderBottomWidth:1,borderBottomColor:D.border,alignItems:'center',
         shadowColor:'rgba(0,0,0,0.05)',shadowOffset:{width:0,height:2},shadowOpacity:1,shadowRadius:4,elevation:2}}>
-        <View style={{flexDirection:'row',alignItems:'center',maxWidth:tvMode?undefined:MAX_W,width:'100%' as any,paddingHorizontal:24}}>
+        <View style={{flexDirection:'row',alignItems:'center',maxWidth:tvMode?undefined:MAX_W,width:'100%' as any,paddingHorizontal:24,gap:20}}>
+
+          {/* Logo */}
+          <View style={{paddingVertical:tvMode?6:10}}>
+            <Logo size={tvMode?"default":"small"}/>
+          </View>
 
           {/* Project tabs */}
           <View style={{flex:1,flexDirection:'row',alignItems:'center'}}>
@@ -1606,9 +1665,9 @@ function MobileHome({sheets,setSheets,token}:{sheets:SheetEntry[];setSheets:(s:S
       <Stack.Screen options={{
         headerShown:true,
         headerTitle:()=>(
-          <View style={{alignItems:'center'}}>
-            <Text style={{color:D.text,fontWeight:'900',fontSize:16,letterSpacing:3}}>ISKER</Text>
-            <Text style={{color:D.muted,fontSize:9,letterSpacing:2,marginTop:-1}}>CONSTRUCTION TRACKER</Text>
+          <View style={{alignItems:'center',gap:2}}>
+            <Logo size="small"/>
+            <Text style={{color:D.muted,fontSize:8,letterSpacing:1}}>CONSTRUCTION TRACKER</Text>
           </View>
         ),
         headerTitleAlign:'center',
@@ -1719,8 +1778,8 @@ function HomeScreenInner({token}:{token:string}) {
   if(extraSheets.length===0)return(
     <View style={{flex:1,backgroundColor:D.bg,alignItems:'center',justifyContent:'center',gap:20}}>
       <Stack.Screen options={{headerShown:false}}/>
-      <Text style={{color:D.text,fontSize:24,fontWeight:'900',letterSpacing:3}}>ISKER</Text>
-      <Text style={{color:D.muted,fontSize:12,letterSpacing:2,marginTop:-8}}>CONSTRUCTION TRACKER</Text>
+      <Logo size="large"/>
+      <Text style={{color:D.muted,fontSize:12,letterSpacing:2,marginTop:8}}>CONSTRUCTION TRACKER</Text>
       <Text style={{color:D.muted,fontSize:14,textAlign:'center',maxWidth:300,lineHeight:22}}>
         Add a Google Sheet to get started
       </Text>

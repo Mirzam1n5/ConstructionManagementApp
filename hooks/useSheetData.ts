@@ -17,10 +17,10 @@ export interface Project {
   cpi: number;
   spi: number;
   notes: string;
-  // New deviation fields
-  cost_variance_usd: number;
-  schedule_variance_days: number;
-  deviation_status: string;
+  // Optional deviation fields (new, may not exist in all sheets)
+  cost_variance_usd?: number;
+  schedule_variance_days?: number;
+  deviation_status?: string;
 }
 
 export interface Worker {
@@ -177,7 +177,7 @@ export function useSheetData(sheetId?: string) {
           fetchSheet<DailyReport>('Daily Reports', sheetId),
         ]);
       
-      // Ensure deviation fields have defaults
+      // Optional: ensure deviation fields have defaults if they exist
       const projectsWithDefaults = projects.map(p => ({
         ...p,
         cost_variance_usd: p.cost_variance_usd ?? 0,
