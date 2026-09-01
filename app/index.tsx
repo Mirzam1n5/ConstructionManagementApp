@@ -910,13 +910,13 @@ function ProjectDashboard({p,data,color}:{p:Project;data:SheetData;color:string}
           </View>
 
           <View style={{flexDirection:'row',alignItems:'center',gap:16}}>
-            {(forecastEnd||deviationDays!=null||planPct!=null) && (
+            {(
               <View style={{flexDirection:'row',flexWrap:'wrap',gap:8,justifyContent:'flex-end',maxWidth:380}}>
                 {startD&&<Stat label="Start Date" value={fmtDate(startD)}/>}
-                {deviationDays!=null&&<Stat label="Deviation" value={`${deviationDays>0?'+':''}${deviationDays}d`} color={deviationDays>0?D.red:D.green}/>}
+                <Stat label="Deviation" value={`${deviationDays!=null?(deviationDays>0?'+':'')+(deviationDays):"0"}d`} color={deviationDays!=null?(deviationDays>0?D.red:D.green):D.sub}/>
                 {forecastEnd&&<Stat label="Forecast End" value={forecastEnd}/>}
                 {planPct!=null&&<Stat label="Plan %" value={fmtP(planPct)}/>}
-                {devPct!=null&&<Stat label="Deviation %" value={`${devPct>0?'+':''}${devPct.toFixed(1)}%`} color={devPct<0?D.red:D.green}/>}
+                <Stat label="Deviation %" value={`${devPct!=null?(devPct>0?'+':'')+(devPct.toFixed(1)):'0'}%`} color={devPct!=null?(devPct<0?D.red:D.green):D.sub}/>
                 <Stat label="Fact %" value={fmtP(prog)}/>
               </View>
             )}
