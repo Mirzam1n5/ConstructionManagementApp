@@ -522,7 +522,21 @@ function ProjectDashboardTV({p,data,color}:{p:Project;data:SheetData;color:strin
   const msDel =schedule.filter(m=>m.status==='Delayed').length;
 
   // ── Date & schedule calculations ──
-  const parseDate=(s:string)=>{const d=new Date(s);return isNaN(d.getTime())?null:d;};
+  const parseDate=(s:string)=>{
+    if(!s||typeof s!=="string") return null;
+    s=s.trim();
+    // Try ISO format first (YYYY-MM-DD)
+    let d=new Date(s);
+    if(!isNaN(d.getTime())) return d;
+    // Try DD-MM-YYYY or DD.MM.YYYY
+    const match=s.match(/^(\d{1,2})[-.](\d{1,2})[-.](\d{4})$/);
+    if(match){
+      const [_,day,month,year]=match;
+      d=new Date(parseInt(year),parseInt(month)-1,parseInt(day));
+      if(!isNaN(d.getTime())) return d;
+    }
+    return null;
+  };
   const startD=parseDate(p.start_date), endD=parseDate(p.end_date);
   const today=new Date();
   const planPct = startD&&endD&&endD>startD
@@ -857,7 +871,21 @@ function ProjectDashboard({p,data,color}:{p:Project;data:SheetData;color:string}
   const msDel =schedule.filter(m=>m.status==='Delayed').length;
 
   // ── Date & schedule calculations ──
-  const parseDate=(s:string)=>{const d=new Date(s);return isNaN(d.getTime())?null:d;};
+  const parseDate=(s:string)=>{
+    if(!s||typeof s!=="string") return null;
+    s=s.trim();
+    // Try ISO format first (YYYY-MM-DD)
+    let d=new Date(s);
+    if(!isNaN(d.getTime())) return d;
+    // Try DD-MM-YYYY or DD.MM.YYYY
+    const match=s.match(/^(\d{1,2})[-.](\d{1,2})[-.](\d{4})$/);
+    if(match){
+      const [_,day,month,year]=match;
+      d=new Date(parseInt(year),parseInt(month)-1,parseInt(day));
+      if(!isNaN(d.getTime())) return d;
+    }
+    return null;
+  };
   const startD=parseDate(p.start_date), endD=parseDate(p.end_date);
   const today=new Date();
   // Planned % at report date
@@ -902,7 +930,7 @@ function ProjectDashboard({p,data,color}:{p:Project;data:SheetData;color:string}
               <Stat label="Deviation" value={`${(deviationDays??0)>0?'+':''}${deviationDays??0}d`} color={(deviationDays??0)>0?D.red:D.green}/>
               <Stat label="Forecast End" value={forecastEnd??"-"}/>
             </View>
-            <View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>
+            <View style={{flexDirection:'row',flexWrap:'wrap',gap:8,marginTop:8}}>
               <Stat label="Plan %" value={planPct!=null?fmtP(planPct):"-"}/>
               <Stat label="Deviation %" value={`${(devPct??0)>0?'+':''}${(devPct??0).toFixed(1)}%`} color={(devPct??0)<0?D.red:D.green}/>
               <Stat label="Fact %" value={fmtP(prog)}/>
