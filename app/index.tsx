@@ -525,7 +525,14 @@ function ProjectDashboardTV({p,data,color}:{p:Project;data:SheetData;color:strin
   const parseDate=(s:string)=>{
     if(!s||typeof s!=="string") return null;
     s=s.trim();
-    // Try ISO format first (YYYY-MM-DD)
+    // Google Sheets format: Date(2028,6,31) where month is 0-indexed
+    const googleMatch=s.match(/^Date\((\d{4}),(\d{1,2}),(\d{1,2})\)$/);
+    if(googleMatch){
+      const [_,year,month,day]=googleMatch;
+      const d=new Date(parseInt(year),parseInt(month),parseInt(day));
+      if(!isNaN(d.getTime())) return d;
+    }
+    // Try ISO format (YYYY-MM-DD)
     let d=new Date(s);
     if(!isNaN(d.getTime())) return d;
     // Try DD-MM-YYYY or DD.MM.YYYY
@@ -538,17 +545,6 @@ function ProjectDashboardTV({p,data,color}:{p:Project;data:SheetData;color:strin
     return null;
   };
   const startD=parseDate(p.start_date), endD=parseDate(p.end_date);
-  // DEBUG
-  if(p.project_name.includes("Heater")) {
-    console.log("DEBUG Heater Island:", {
-      start_date_raw: p.start_date,
-      end_date_raw: p.end_date,
-      startD: startD,
-      endD: endD,
-      typeof_start: typeof p.start_date,
-      length_start: (p.start_date ?? "").length
-    });
-  }
   const today=new Date();
   const planPct = startD&&endD&&endD>startD
     ? Math.min(100,Math.max(0,((today.getTime()-startD.getTime())/(endD.getTime()-startD.getTime()))*100))
@@ -885,7 +881,14 @@ function ProjectDashboard({p,data,color}:{p:Project;data:SheetData;color:string}
   const parseDate=(s:string)=>{
     if(!s||typeof s!=="string") return null;
     s=s.trim();
-    // Try ISO format first (YYYY-MM-DD)
+    // Google Sheets format: Date(2028,6,31) where month is 0-indexed
+    const googleMatch=s.match(/^Date\((\d{4}),(\d{1,2}),(\d{1,2})\)$/);
+    if(googleMatch){
+      const [_,year,month,day]=googleMatch;
+      const d=new Date(parseInt(year),parseInt(month),parseInt(day));
+      if(!isNaN(d.getTime())) return d;
+    }
+    // Try ISO format (YYYY-MM-DD)
     let d=new Date(s);
     if(!isNaN(d.getTime())) return d;
     // Try DD-MM-YYYY or DD.MM.YYYY
@@ -898,17 +901,6 @@ function ProjectDashboard({p,data,color}:{p:Project;data:SheetData;color:string}
     return null;
   };
   const startD=parseDate(p.start_date), endD=parseDate(p.end_date);
-  // DEBUG
-  if(p.project_name.includes("Heater")) {
-    console.log("DEBUG Heater Island:", {
-      start_date_raw: p.start_date,
-      end_date_raw: p.end_date,
-      startD: startD,
-      endD: endD,
-      typeof_start: typeof p.start_date,
-      length_start: (p.start_date ?? "").length
-    });
-  }
   const today=new Date();
   // Planned % at report date
   const planPct = startD&&endD&&endD>startD
