@@ -538,6 +538,17 @@ function ProjectDashboardTV({p,data,color}:{p:Project;data:SheetData;color:strin
     return null;
   };
   const startD=parseDate(p.start_date), endD=parseDate(p.end_date);
+  // DEBUG
+  if(p.project_name.includes("Heater")) {
+    console.log("DEBUG Heater Island:", {
+      start_date_raw: p.start_date,
+      end_date_raw: p.end_date,
+      startD: startD,
+      endD: endD,
+      typeof_start: typeof p.start_date,
+      length_start: (p.start_date ?? "").length
+    });
+  }
   const today=new Date();
   const planPct = startD&&endD&&endD>startD
     ? Math.min(100,Math.max(0,((today.getTime()-startD.getTime())/(endD.getTime()-startD.getTime()))*100))
@@ -887,6 +898,17 @@ function ProjectDashboard({p,data,color}:{p:Project;data:SheetData;color:string}
     return null;
   };
   const startD=parseDate(p.start_date), endD=parseDate(p.end_date);
+  // DEBUG
+  if(p.project_name.includes("Heater")) {
+    console.log("DEBUG Heater Island:", {
+      start_date_raw: p.start_date,
+      end_date_raw: p.end_date,
+      startD: startD,
+      endD: endD,
+      typeof_start: typeof p.start_date,
+      length_start: (p.start_date ?? "").length
+    });
+  }
   const today=new Date();
   // Planned % at report date
   const planPct = startD&&endD&&endD>startD
