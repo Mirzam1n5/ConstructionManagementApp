@@ -897,10 +897,12 @@ function ProjectDashboard({p,data,color}:{p:Project;data:SheetData;color:string}
           </View>
 
           <View style={{flexDirection:'row',alignItems:'center',gap:16}}>
-            <View style={{flexDirection:'row',flexWrap:'wrap',gap:8,justifyContent:'flex-end',maxWidth:380}}>
+            <View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>
               <Stat label="Start Date" value={startD?fmtDate(startD):"-"}/>
               <Stat label="Deviation" value={`${(deviationDays??0)>0?'+':''}${deviationDays??0}d`} color={(deviationDays??0)>0?D.red:D.green}/>
               <Stat label="Forecast End" value={forecastEnd??"-"}/>
+            </View>
+            <View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>
               <Stat label="Plan %" value={planPct!=null?fmtP(planPct):"-"}/>
               <Stat label="Deviation %" value={`${(devPct??0)>0?'+':''}${(devPct??0).toFixed(1)}%`} color={(devPct??0)<0?D.red:D.green}/>
               <Stat label="Fact %" value={fmtP(prog)}/>
