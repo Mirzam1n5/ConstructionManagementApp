@@ -43,9 +43,11 @@ function Logo({size='default'}:{size?:'small'|'default'|'large'}) {
   const s = sizeMap[size];
   return Platform.OS === 'web' ? (
     <img 
-      src={require('../assets/iskerlogo.png').default || require('../assets/iskerlogo.png')} 
+      src="/iskerlogo.png"
       style={{width: s.w, height: s.h, objectFit: 'contain', display: 'block', border: '2px solid red'}} 
-      alt="ISKER Logo" 
+      alt="ISKER Logo"
+      onError={(e) => {console.log("Logo load error:", e); console.log("src was:", (e.target as any).src);}}
+      onLoad={() => console.log("Logo loaded successfully!")}
     />
   ) : (
     <Image 
