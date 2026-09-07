@@ -44,7 +44,7 @@ function Logo({size='default'}:{size?:'small'|'default'|'large'}) {
   return Platform.OS === 'web' ? (
     <img 
       src={require('../assets/iskerlogo.png').default || require('../assets/iskerlogo.png')} 
-      style={{width: s.w, height: s.h, objectFit: 'contain', display: 'block'}} 
+      style={{width: s.w, height: s.h, objectFit: 'contain', display: 'block', border: '2px solid red'}} 
       alt="ISKER Logo" 
     />
   ) : (
