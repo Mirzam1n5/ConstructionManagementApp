@@ -551,16 +551,15 @@ function ProjectDashboardTV({p,data,color}:{p:Project;data:SheetData;color:strin
     : null;
   const devPct = planPct!=null ? prog - planPct : null;
   const fmtDate=(d:Date)=>`${d.getDate().toString().padStart(2,'0')}.${(d.getMonth()+1).toString().padStart(2,'0')}.${d.getFullYear()}`;
-  let forecastEnd:string|null=null;
-  let deviationDays:number|null=null;
-  if(startD&&endD) {
-    const plannedDays=(endD.getTime()-startD.getTime())/(1000*60*60*24);
-    // No SPI data yet (project not started / no progress) → best estimate is the planned end date
-    const forecastDays=spi>0?plannedDays/spi:plannedDays;
-    const fe=new Date(startD.getTime()+forecastDays*1000*60*60*24);
-    forecastEnd=fmtDate(fe);
-    deviationDays=Math.round(forecastDays-plannedDays);
-  }
+  // Deviation is now sourced from the sheet's own schedule_variance_days formula
+  // (rather than derived from SPI), so it always matches what's in the spreadsheet.
+  const deviationDays:number|null = p.schedule_variance_days!=null ? Math.round(num(p.schedule_variance_days)) : null;
+  const forecastEnd:string|null = endD
+    ? fmtDate(new Date(endD.getTime()+(deviationDays??0)*1000*60*60*24))
+    : null;
+  const devColor = (p.deviation_status && p.deviation_status !== 'Unknown')
+    ? (['Delayed','Behind','At Risk'].includes(p.deviation_status) ? D.red : D.green)
+    : ((deviationDays??0)>0?D.red:D.green);
 
   return(
     <View style={{flex:1,gap:14}}>
@@ -585,7 +584,7 @@ function ProjectDashboardTV({p,data,color}:{p:Project;data:SheetData;color:strin
             <View style={{flexDirection:'row',gap:8}}>
               {forecastEnd&&<Stat size="lg" label="Forecast End" value={forecastEnd}
                 sub={`${(deviationDays??0)>0?'+':''}${deviationDays??0}d vs plan`}
-                subColor={(deviationDays??0)>0?D.red:D.green}/>}
+                subColor={devColor}/>}
               {planPct!=null&&<Stat size="lg" label="Plan → Fact" value={`${fmtP(planPct)} → ${fmtP(prog)}`}
                 sub={devPct!=null?`${devPct>0?'+':''}${devPct.toFixed(1)}%`:undefined}
                 subColor={devPct!=null?(devPct<0?D.red:D.green):undefined}/>}
@@ -908,18 +907,16 @@ function ProjectDashboard({p,data,color}:{p:Project;data:SheetData;color:string}
     : null;
   // Deviation % = fact% - plan%
   const devPct = planPct!=null ? prog - planPct : null;
-  // Forecast end date based on SPI
   const fmtDate=(d:Date)=>`${d.getDate().toString().padStart(2,'0')}.${(d.getMonth()+1).toString().padStart(2,'0')}.${d.getFullYear()}`;
-  let forecastEnd:string|null=null;
-  let deviationDays:number|null=null;
-  if(startD&&endD) {
-    const plannedDays=(endD.getTime()-startD.getTime())/(1000*60*60*24);
-    // No SPI data yet (project not started / no progress) → best estimate is the planned end date
-    const forecastDays=spi>0?plannedDays/spi:plannedDays;
-    const fe=new Date(startD.getTime()+forecastDays*1000*60*60*24);
-    forecastEnd=fmtDate(fe);
-    deviationDays=Math.round(forecastDays-plannedDays);
-  }
+  // Deviation is now sourced from the sheet's own schedule_variance_days formula
+  // (rather than derived from SPI), so it always matches what's in the spreadsheet.
+  const deviationDays:number|null = p.schedule_variance_days!=null ? Math.round(num(p.schedule_variance_days)) : null;
+  const forecastEnd:string|null = endD
+    ? fmtDate(new Date(endD.getTime()+(deviationDays??0)*1000*60*60*24))
+    : null;
+  const devColor = (p.deviation_status && p.deviation_status !== 'Unknown')
+    ? (['Delayed','Behind','At Risk'].includes(p.deviation_status) ? D.red : D.green)
+    : ((deviationDays??0)>0?D.red:D.green);
 
   return(
     <View style={{gap:14}}>
@@ -941,7 +938,7 @@ function ProjectDashboard({p,data,color}:{p:Project;data:SheetData;color:string}
           <View style={{flexDirection:'row',alignItems:'center',gap:16}}>
             <View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>
               <Stat label="Start Date" value={startD?fmtDate(startD):"-"}/>
-              <Stat label="Deviation" value={`${(deviationDays??0)>0?'+':''}${deviationDays??0}d`} color={(deviationDays??0)>0?D.red:D.green}/>
+              <Stat label="Deviation" value={`${(deviationDays??0)>0?'+':''}${deviationDays??0}d`} color={devColor}/>
               <Stat label="Forecast End" value={forecastEnd??"-"}/>
             </View>
             <View style={{flexDirection:'row',flexWrap:'wrap',gap:8,marginTop:8}}>
