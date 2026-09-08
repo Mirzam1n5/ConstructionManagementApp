@@ -554,9 +554,8 @@ function ProjectDashboardTV({p,data,color}:{p:Project;data:SheetData;color:strin
   // Deviation is now sourced from the sheet's own schedule_variance_days formula
   // (rather than derived from SPI), so it always matches what's in the spreadsheet.
   const deviationDays:number|null = p.schedule_variance_days!=null ? Math.round(num(p.schedule_variance_days)) : null;
-  const forecastEnd:string|null = endD
-    ? fmtDate(new Date(endD.getTime()+(deviationDays??0)*1000*60*60*24))
-    : null;
+  // Just show the sheet's own end_date for now — not adjusting by schedule_variance_days
+  const forecastEnd:string|null = endD ? fmtDate(endD) : null;
   const devColor = (p.deviation_status && p.deviation_status !== 'Unknown')
     ? (['Delayed','Behind','At Risk'].includes(p.deviation_status) ? D.red : D.green)
     : ((deviationDays??0)>0?D.red:D.green);
@@ -911,9 +910,8 @@ function ProjectDashboard({p,data,color}:{p:Project;data:SheetData;color:string}
   // Deviation is now sourced from the sheet's own schedule_variance_days formula
   // (rather than derived from SPI), so it always matches what's in the spreadsheet.
   const deviationDays:number|null = p.schedule_variance_days!=null ? Math.round(num(p.schedule_variance_days)) : null;
-  const forecastEnd:string|null = endD
-    ? fmtDate(new Date(endD.getTime()+(deviationDays??0)*1000*60*60*24))
-    : null;
+  // Just show the sheet's own end_date for now — not adjusting by schedule_variance_days
+  const forecastEnd:string|null = endD ? fmtDate(endD) : null;
   const devColor = (p.deviation_status && p.deviation_status !== 'Unknown')
     ? (['Delayed','Behind','At Risk'].includes(p.deviation_status) ? D.red : D.green)
     : ((deviationDays??0)>0?D.red:D.green);
