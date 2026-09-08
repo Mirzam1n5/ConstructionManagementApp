@@ -21,6 +21,12 @@ export interface Project {
   cost_variance_usd?: number;
   schedule_variance_days?: number;
   deviation_status?: string;
+  // Optional plan/fact/deviation % fields, computed by formula in the sheet itself.
+  // Not all project sheets have these yet, so they stay undefined (not defaulted)
+  // and the dashboard falls back to computing them client-side when missing.
+  plan_pct?: number;
+  fact_pct?: number;
+  deviation_pct?: number;
 }
 
 export interface Worker {
@@ -183,6 +189,12 @@ export function useSheetData(sheetId?: string) {
         cost_variance_usd: p.cost_variance_usd ?? 0,
         schedule_variance_days: p.schedule_variance_days ?? 0,
         deviation_status: p.deviation_status ?? 'Unknown',
+        // plan_pct / fact_pct / deviation_pct are left as-is (undefined if the
+        // sheet doesn't have the columns yet) so the dashboard can tell the
+        // difference between "0%" and "not provided" and fall back accordingly.
+        plan_pct: p.plan_pct,
+        fact_pct: p.fact_pct,
+        deviation_pct: p.deviation_pct,
       }));
 
       setData({ 

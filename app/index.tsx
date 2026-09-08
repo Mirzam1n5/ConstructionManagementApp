@@ -546,10 +546,17 @@ function ProjectDashboardTV({p,data,color}:{p:Project;data:SheetData;color:strin
   };
   const startD=parseDate(p.start_date), endD=parseDate(p.end_date);
   const today=new Date();
-  const planPct = startD&&endD&&endD>startD
-    ? Math.min(100,Math.max(0,((today.getTime()-startD.getTime())/(endD.getTime()-startD.getTime()))*100))
-    : null;
-  const devPct = planPct!=null ? prog - planPct : null;
+  // Plan/Fact/Deviation % now come from the sheet's own formulas (plan_pct,
+  // fact_pct, deviation_pct on the Projects tab) when present, so the app just
+  // displays what's in the spreadsheet instead of recomputing it. Falls back to
+  // the old date-based estimate for sheets that don't have these columns yet.
+  const planPct = p.plan_pct!=null ? num(p.plan_pct)
+    : (startD&&endD&&endD>startD
+        ? Math.min(100,Math.max(0,((today.getTime()-startD.getTime())/(endD.getTime()-startD.getTime()))*100))
+        : null);
+  const factPct = p.fact_pct!=null ? num(p.fact_pct) : prog;
+  const devPct = p.deviation_pct!=null ? num(p.deviation_pct)
+    : (planPct!=null ? factPct - planPct : null);
   const fmtDate=(d:Date)=>`${d.getDate().toString().padStart(2,'0')}.${(d.getMonth()+1).toString().padStart(2,'0')}.${d.getFullYear()}`;
   // Deviation is now sourced from the sheet's own schedule_variance_days formula
   // (rather than derived from SPI), so it always matches what's in the spreadsheet.
@@ -584,7 +591,7 @@ function ProjectDashboardTV({p,data,color}:{p:Project;data:SheetData;color:strin
               {forecastEnd&&<Stat size="lg" label="Forecast End" value={forecastEnd}
                 sub={`${(deviationDays??0)>0?'+':''}${deviationDays??0}d vs plan`}
                 subColor={devColor}/>}
-              {planPct!=null&&<Stat size="lg" label="Plan → Fact" value={`${fmtP(planPct)} → ${fmtP(prog)}`}
+              {planPct!=null&&<Stat size="lg" label="Plan → Fact" value={`${fmtP(planPct)} → ${fmtP(factPct)}`}
                 sub={devPct!=null?`${devPct>0?'+':''}${devPct.toFixed(1)}%`:undefined}
                 subColor={devPct!=null?(devPct<0?D.red:D.green):undefined}/>}
             </View>
@@ -900,12 +907,17 @@ function ProjectDashboard({p,data,color}:{p:Project;data:SheetData;color:string}
   };
   const startD=parseDate(p.start_date), endD=parseDate(p.end_date);
   const today=new Date();
-  // Planned % at report date
-  const planPct = startD&&endD&&endD>startD
-    ? Math.min(100,Math.max(0,((today.getTime()-startD.getTime())/(endD.getTime()-startD.getTime()))*100))
-    : null;
-  // Deviation % = fact% - plan%
-  const devPct = planPct!=null ? prog - planPct : null;
+  // Plan/Fact/Deviation % now come from the sheet's own formulas (plan_pct,
+  // fact_pct, deviation_pct on the Projects tab) when present, so the app just
+  // displays what's in the spreadsheet instead of recomputing it. Falls back to
+  // the old date-based estimate for sheets that don't have these columns yet.
+  const planPct = p.plan_pct!=null ? num(p.plan_pct)
+    : (startD&&endD&&endD>startD
+        ? Math.min(100,Math.max(0,((today.getTime()-startD.getTime())/(endD.getTime()-startD.getTime()))*100))
+        : null);
+  const factPct = p.fact_pct!=null ? num(p.fact_pct) : prog;
+  const devPct = p.deviation_pct!=null ? num(p.deviation_pct)
+    : (planPct!=null ? factPct - planPct : null);
   const fmtDate=(d:Date)=>`${d.getDate().toString().padStart(2,'0')}.${(d.getMonth()+1).toString().padStart(2,'0')}.${d.getFullYear()}`;
   // Deviation is now sourced from the sheet's own schedule_variance_days formula
   // (rather than derived from SPI), so it always matches what's in the spreadsheet.
@@ -942,7 +954,7 @@ function ProjectDashboard({p,data,color}:{p:Project;data:SheetData;color:string}
             <View style={{flexDirection:'row',flexWrap:'wrap',gap:8,marginTop:8}}>
               <Stat label="Plan %" value={planPct!=null?fmtP(planPct):"-"}/>
               <Stat label="Deviation %" value={`${(devPct??0)>0?'+':''}${(devPct??0).toFixed(1)}%`} color={(devPct??0)<0?D.red:D.green}/>
-              <Stat label="Fact %" value={fmtP(prog)}/>
+              <Stat label="Fact %" value={fmtP(factPct)}/>
             </View>
             <Text style={{fontSize:44,fontWeight:'900',color,lineHeight:46}}>{fmtP(prog)}</Text>
           </View>
