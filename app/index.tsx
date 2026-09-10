@@ -1077,7 +1077,7 @@ function ProjectDashboard({p,data,color}:{p:Project;data:SheetData;color:string}
           <View style={{alignItems:'center',flex:1,justifyContent:'center'}}>
             <Donut
               slices={catData.map((c,i)=>({v:c.ac,c:DC[i%7]}))}
-              size={104}
+              size={220}
               label={fmtM(catData.reduce((s,c)=>s+c.ac,0))}
               sublabel="actual"
             />
