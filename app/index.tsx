@@ -280,6 +280,17 @@ function Donut({slices,size,label,sublabel}:{slices:{v:number;c:string}[];size:n
   const total=slices.reduce((s,d)=>s+d.v,0)||1;
   const cx=size/2,cy=size/2,r=size*0.34,sw=size*0.16;
   let angle=-Math.PI/2;
+  // Keep the center label from overlapping the ring: shrink its font size
+  // if the text would be wider than the donut's inner "hole".
+  const holeD=2*(r-sw/2);
+  const fitFont=(text:string|undefined,baseFont:number,charW=0.6)=>{
+    if(!text)return baseFont;
+    const estWidth=text.length*charW*baseFont;
+    const maxWidth=holeD*0.82;
+    return estWidth>maxWidth ? maxWidth/(text.length*charW) : baseFont;
+  };
+  const labelFont=fitFont(label,size*0.19);
+  const sublabelFont=fitFont(sublabel,size*0.1);
   return (
     <Svg width={size} height={size}>
       {slices.map((sl,i)=>{
@@ -292,8 +303,8 @@ function Donut({slices,size,label,sublabel}:{slices:{v:number;c:string}[];size:n
         if(Math.abs(sl.v-total)<0.001)return<Circle key={i} cx={cx} cy={cy} r={r} fill="none" stroke={sl.c} strokeWidth={sw}/>;
         return<Path key={i} d={`M${x1},${y1} A${r},${r} 0 ${lg} 1 ${x2},${y2}`} fill="none" stroke={sl.c} strokeWidth={sw} strokeLinecap="butt"/>;
       })}
-      {label&&<ST x={cx} y={sublabel?cy-2:cy+5} textAnchor="middle" fontFamily="System" fontSize={size*0.19} fontWeight="800" fill={D.text}>{label}</ST>}
-      {sublabel&&<ST x={cx} y={cy+size*0.13} textAnchor="middle" fontFamily="System" fontSize={size*0.1} fontWeight="500" fill={D.muted}>{sublabel}</ST>}
+      {label&&<ST x={cx} y={sublabel?cy-2:cy+5} textAnchor="middle" fontFamily="System" fontSize={labelFont} fontWeight="800" fill={D.text}>{label}</ST>}
+      {sublabel&&<ST x={cx} y={cy+size*0.13} textAnchor="middle" fontFamily="System" fontSize={sublabelFont} fontWeight="500" fill={D.muted}>{sublabel}</ST>}
     </Svg>
   );
 }
