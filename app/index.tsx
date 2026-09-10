@@ -1065,8 +1065,8 @@ function ProjectDashboard({p,data,color}:{p:Project;data:SheetData;color:string}
                     </View>
                   </View>
                   <View style={{height:14,backgroundColor:D.bg,borderRadius:7,overflow:'hidden'}}>
-                    <View style={{position:'absolute',top:0,left:0,height:14,width:`${phPlannedPct}%` as any,backgroundColor:phCol,opacity:0.25,borderRadius:7}}/>
-                    <View style={{position:'absolute',top:0,left:0,height:14,width:`${phPct}%` as any,backgroundColor:phCol,opacity:0.85,borderRadius:7}}/>
+                    {phPct>0&&<View style={{position:'absolute',top:0,left:0,height:14,width:`${phPlannedPct}%` as any,backgroundColor:phCol,opacity:0.25,borderRadius:7}}/>}
+                    {phPct>0&&<View style={{position:'absolute',top:0,left:0,height:14,width:`${phPct}%` as any,backgroundColor:phCol,opacity:0.85,borderRadius:7}}/>}
                   </View>
                 </View>
               );
