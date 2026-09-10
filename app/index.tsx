@@ -1036,15 +1036,26 @@ function ProjectDashboard({p,data,color}:{p:Project;data:SheetData;color:string}
               const phMs=schedule.filter(m=>m.phase===phase);
               const phDone=phMs.filter(m=>m.status==='Done').length;
               const phPct=phMs.length>0?(phDone/phMs.length)*100:0;
+              // "Planned %" = share of this phase's milestones whose planned_end date has
+              // already passed — i.e. how far along the phase should be by today per plan.
+              const phPlannedDone=phMs.filter(m=>{
+                const pd=parseDate(m.planned_end);
+                return pd&&pd<=today;
+              }).length;
+              const phPlannedPct=phMs.length>0?(phPlannedDone/phMs.length)*100:0;
               const phCol=phPct===100?D.green:phMs.some(m=>m.status==='Delayed')?D.red:D.blue;
               return(
                 <View key={phase} style={{gap:3}}>
                   <View style={{flexDirection:'row',justifyContent:'space-between'}}>
                     <Text style={{fontSize:11,color:D.text}}>{phase}</Text>
-                    <Text style={{fontSize:11,color:phCol,fontWeight:'700'}}>{fmtP(phPct)}</Text>
+                    <View style={{flexDirection:'row',alignItems:'center',gap:8}}>
+                      <Text style={{fontSize:11,color:D.muted}}>{fmtP(phPlannedPct)} plan</Text>
+                      <Text style={{fontSize:11,color:phCol,fontWeight:'700'}}>{fmtP(phPct)}</Text>
+                    </View>
                   </View>
-                  <View style={{height:14,backgroundColor:D.bg,borderRadius:7}}>
-                    <View style={{height:14,width:`${phPct}%` as any,backgroundColor:phCol,borderRadius:7}}/>
+                  <View style={{height:14,backgroundColor:D.bg,borderRadius:7,overflow:'hidden'}}>
+                    <View style={{position:'absolute',top:0,left:0,height:14,width:`${phPlannedPct}%` as any,backgroundColor:phCol,opacity:0.25,borderRadius:7}}/>
+                    <View style={{position:'absolute',top:0,left:0,height:14,width:`${phPct}%` as any,backgroundColor:phCol,opacity:0.85,borderRadius:7}}/>
                   </View>
                 </View>
               );
@@ -1063,7 +1074,7 @@ function ProjectDashboard({p,data,color}:{p:Project;data:SheetData;color:string}
         {/* Budget by Category */}
         <Card style={{flex:2,padding:16,gap:14}}>
           <SH label="Budget by Category" color={D.orange}/>
-          <View style={{alignItems:'center'}}>
+          <View style={{alignItems:'center',flex:1,justifyContent:'center'}}>
             <Donut
               slices={catData.map((c,i)=>({v:c.ac,c:DC[i%7]}))}
               size={104}
@@ -1071,31 +1082,6 @@ function ProjectDashboard({p,data,color}:{p:Project;data:SheetData;color:string}
               sublabel="actual"
             />
           </View>
-          <View style={{flex:1,gap:10,justifyContent:'center'}}>
-            {catData.map((c,i)=>{
-              const max=catData[0]?.pl??1,over=c.ac>c.pl;
-              const pct=c.pl>0?Math.round((c.ac/c.pl)*100):0;
-              return(
-                <View key={c.cat} style={{gap:4}}>
-                  <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between'}}>
-                    <View style={{flexDirection:'row',alignItems:'center',gap:6,flex:1}}>
-                      <View style={{width:8,height:8,borderRadius:4,backgroundColor:DC[i%7]}}/>
-                      <Text style={{fontSize:12,color:D.text,flex:1}} numberOfLines={1}>{c.cat}</Text>
-                    </View>
-                    <View style={{flexDirection:'row',alignItems:'center',gap:8}}>
-                      <Text style={{fontSize:11,color:D.muted}}>{fmtM(c.ac)}</Text>
-                      <Text style={{fontSize:11,fontWeight:'800',color:over?D.red:D.green,minWidth:36,textAlign:'right'}}>{pct}%</Text>
-                    </View>
-                  </View>
-                  <View style={{height:14,backgroundColor:D.bg,borderRadius:7,overflow:'hidden'}}>
-                    <View style={{position:'absolute',top:0,left:0,height:14,width:`${(c.pl/max)*100}%` as any,backgroundColor:DC[i%7],opacity:0.25,borderRadius:7}}/>
-                    <View style={{position:'absolute',top:0,left:0,height:14,width:`${(c.ac/max)*100}%` as any,backgroundColor:over?D.red:DC[i%7],opacity:0.85,borderRadius:7}}/>
-                  </View>
-                </View>
-              );
-            })}
-          </View>
-          <Legend items={[{label:'Planned',color:D.blue},{label:'Actual',color:D.green}]}/>
         </Card>
       </View>
 
