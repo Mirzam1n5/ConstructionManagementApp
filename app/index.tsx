@@ -1298,6 +1298,7 @@ function TVEmptySide() {
 
 function WebLayout({sheets,setSheets,token}:{sheets:SheetEntry[];setSheets:(s:SheetEntry[]|((_:SheetEntry[])=>SheetEntry[]))=>void;token:string}) {
   const {D,isDark,toggleTheme} = useTheme();
+  const {height:winH} = useWindowDimensions();
   const PC = getPC(D);
   const [activeIdx,setActiveIdx]=useState(0);
   const [tvMode,setTvMode]=useState(false);
@@ -1344,7 +1345,7 @@ function WebLayout({sheets,setSheets,token}:{sheets:SheetEntry[];setSheets:(s:Sh
   const color = PC[activeIdx%3];
 
   return(
-    <View style={{flex:1,height:'100vh' as any,backgroundColor:D.bg}}>
+    <View style={{flex:1,height:winH,backgroundColor:D.bg}}>
       <Stack.Screen options={{headerShown:false}}/>
 
       {/* Confirm remove modal */}
