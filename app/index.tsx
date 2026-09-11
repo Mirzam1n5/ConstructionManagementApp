@@ -49,7 +49,7 @@ function Logo({size='default'}:{size?:'small'|'default'|'large'}) {
     />
   ) : (
     <Image 
-      source={require('../assets/iskerlogo.png')} 
+      source={require('../public/iskerlogo.png')} 
       style={{width: s.w, height: s.h, resizeMode: 'contain'}} 
     />
   );
@@ -489,7 +489,6 @@ function ProjectDashboardTV({p,data,color}:{p:Project;data:SheetData;color:strin
   const {D} = useTheme();
   const PC = getPC(D);
   const DC = getDC(D);
-  const [openModal,setOpenModal] = useState<'milestones'|'budget'|null>(null);
 
   const workers  = data.workers.filter(w=>w.project_id===p.project_id);
   const evm      = data.evm.filter(e=>e.project_id===p.project_id);
@@ -520,17 +519,6 @@ function ProjectDashboardTV({p,data,color}:{p:Project;data:SheetData;color:strin
   const cpiS=evm.map(e=>num(e.cpi));
   const spiS=evm.map(e=>num(e.spi));
   const latestEvm=evm[evm.length-1];
-
-  const cats=[...new Set(budget.map(b=>b.category))];
-  const catData=cats.map(cat=>{
-    const rows=budget.filter(b=>b.category===cat);
-    return{cat,pl:rows.reduce((s,r)=>s+num(r.planned_usd),0),ac:rows.reduce((s,r)=>s+num(r.actual_usd),0)};
-  }).sort((a,b)=>b.pl-a.pl).slice(0,10);
-
-  const phases=[...new Set(schedule.map(m=>m.phase))].filter(Boolean) as string[];
-  const msDone=schedule.filter(m=>m.status==='Done').length;
-  const msInP =schedule.filter(m=>m.status==='In Progress').length;
-  const msDel =schedule.filter(m=>m.status==='Delayed').length;
 
   // ── Date & schedule calculations ──
   const parseDate=(s:string)=>{
@@ -583,9 +571,9 @@ function ProjectDashboardTV({p,data,color}:{p:Project;data:SheetData;color:strin
 
       {/* ══ HEADER STRIP ══ */}
       <Card style={{borderLeftWidth:5,borderLeftColor:color,paddingVertical:14,paddingHorizontal:22,gap:10}}>
-        <View style={{flexDirection:'row',alignItems:'center',gap:18}}>
+        <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:14}}>
           <View style={{gap:2}}>
-            <View style={{flexDirection:'row',alignItems:'center',gap:7}}>
+            <View style={{flexDirection:'row',alignItems:'center',gap:7,flexWrap:'wrap'}}>
               <View style={{width:7,height:7,borderRadius:3.5,backgroundColor:sCol(D,p.status)}}/>
               <Text style={{fontSize:11,color:sCol(D,p.status),fontWeight:'800',letterSpacing:1}}>{p.status.toUpperCase()}</Text>
               {startD&&endD&&<Text style={{fontSize:11,color:D.muted}}>·  {fmtDate(startD)} → {fmtDate(endD)}</Text>}
@@ -593,54 +581,57 @@ function ProjectDashboardTV({p,data,color}:{p:Project;data:SheetData;color:strin
             <Text style={{fontSize:23,color:D.text,fontWeight:'900'}}>{p.project_name}</Text>
             <Text style={{fontSize:12,color:D.sub}}>{p.client} · {p.location}</Text>
           </View>
-          <View style={{flex:1}}/>
 
-          {/* Schedule group */}
-          <View>
-            <GroupLabel>Schedule</GroupLabel>
-            <View style={{flexDirection:'row',gap:8}}>
-              {forecastEnd&&<Stat size="lg" label="Forecast End" value={forecastEnd}
-                sub={`${(deviationDays??0)>0?'+':''}${deviationDays??0}d vs plan`}
-                subColor={devColor}/>}
-              {planPct!=null&&<Stat size="lg" label="Plan → Fact" value={`${fmtP(planPct)} → ${fmtP(factPct)}`}
-                sub={devPct!=null?`${devPct>0?'+':''}${devPct.toFixed(1)}%`:undefined}
-                subColor={devPct!=null?(devPct<0?D.red:D.green):undefined}/>}
-            </View>
-          </View>
-
-          <VDivider/>
-
-          {/* Budget group */}
-          <View>
-            <GroupLabel>Budget</GroupLabel>
-            <View style={{flexDirection:'row',gap:8}}>
-              <Stat size="lg" label="Budget" value={fmtM(total)}/>
-              <Stat size="lg" label="Spent" value={fmtM(spent)} color={bCol} sub={fmtP(bPct)+' used'}/>
-            </View>
-          </View>
-
-          <VDivider/>
-
-          {/* Index group */}
-          <View>
-            <GroupLabel>Index</GroupLabel>
-            <View style={{flexDirection:'row',gap:8}}>
-              <View style={{backgroundColor:D.bg,borderRadius:10,borderWidth:1,borderColor:D.border,padding:6,alignItems:'center'}}>
-                <NeedleGauge value={cpi} label="CPI" size={72}/>
+          {/* Stat groups wrap together as one unit onto a new line on narrow panels
+              (small TVs, or a split-screen half) instead of squeezing/overflowing. */}
+          <View style={{flexDirection:'row',alignItems:'center',flexWrap:'wrap',gap:18}}>
+            {/* Schedule group */}
+            <View>
+              <GroupLabel>Schedule</GroupLabel>
+              <View style={{flexDirection:'row',gap:8,flexWrap:'wrap'}}>
+                {forecastEnd&&<Stat size="lg" label="Forecast End" value={forecastEnd}
+                  sub={`${(deviationDays??0)>0?'+':''}${deviationDays??0}d vs plan`}
+                  subColor={devColor}/>}
+                {planPct!=null&&<Stat size="lg" label="Plan → Fact" value={`${fmtP(planPct)} → ${fmtP(factPct)}`}
+                  sub={devPct!=null?`${devPct>0?'+':''}${devPct.toFixed(1)}%`:undefined}
+                  subColor={devPct!=null?(devPct<0?D.red:D.green):undefined}/>}
               </View>
-              <View style={{backgroundColor:D.bg,borderRadius:10,borderWidth:1,borderColor:D.border,padding:6,alignItems:'center'}}>
-                <NeedleGauge value={spi} label="SPI" size={72}/>
+            </View>
+
+            <VDivider/>
+
+            {/* Budget group */}
+            <View>
+              <GroupLabel>Budget</GroupLabel>
+              <View style={{flexDirection:'row',gap:8,flexWrap:'wrap'}}>
+                <Stat size="lg" label="Budget" value={fmtM(total)}/>
+                <Stat size="lg" label="Spent" value={fmtM(spent)} color={bCol} sub={fmtP(bPct)+' used'}/>
+              </View>
+            </View>
+
+            <VDivider/>
+
+            {/* Index group */}
+            <View>
+              <GroupLabel>Index</GroupLabel>
+              <View style={{flexDirection:'row',gap:8,flexWrap:'wrap'}}>
+                <View style={{backgroundColor:D.bg,borderRadius:10,borderWidth:1,borderColor:D.border,padding:6,alignItems:'center'}}>
+                  <NeedleGauge value={cpi} label="CPI" size={72}/>
+                </View>
+                <View style={{backgroundColor:D.bg,borderRadius:10,borderWidth:1,borderColor:D.border,padding:6,alignItems:'center'}}>
+                  <NeedleGauge value={spi} label="SPI" size={72}/>
+                </View>
               </View>
             </View>
           </View>
         </View>
       </Card>
 
-      {/* ══ ROW 1: Gauge | CPI/SPI tiles | Milestones (full) ══ */}
-      <View style={{flex:5,flexDirection:'row',gap:14}}>
+      {/* ══ ROW 1: Gauge | CPI/SPI tiles (Milestones hidden on TV for now) ══ */}
+      <View style={{flex:5,flexDirection:'row',flexWrap:'wrap',gap:14}}>
 
         {/* Gauge */}
-        <Card style={{flex:1.2,minWidth:150,maxWidth:220,padding:14,alignItems:'center',justifyContent:'center'}}>
+        <Card style={{flex:1.4,minWidth:220,padding:14,alignItems:'center',justifyContent:'center'}}>
           <ChartBox2>{(cw,ch)=>{
             const size=Math.min(cw,ch/0.72)*0.98;
             return(
@@ -652,7 +643,7 @@ function ProjectDashboardTV({p,data,color}:{p:Project;data:SheetData;color:strin
         </Card>
 
         {/* CPI / SPI large tiles */}
-        <View style={{width:160,gap:12}}>
+        <View style={{flex:1,minWidth:180,gap:12}}>
           <Card style={{flex:1,alignItems:'center',justifyContent:'center',gap:3,
             backgroundColor:cpi>=1?D.greenDim:D.redDim,borderColor:cpi>=1?D.green:D.red}}>
             <Text style={{fontSize:11,color:D.sub,letterSpacing:1.5}}>CPI</Text>
@@ -666,78 +657,16 @@ function ProjectDashboardTV({p,data,color}:{p:Project;data:SheetData;color:strin
             <Text style={{fontSize:11,color:iCol(D,spi),fontWeight:'700'}}>{spi>=1?'ON SCHEDULE':'BEHIND'}</Text>
           </Card>
         </View>
-
-        {/* Milestones — truncated phase list + View all on TV */}
-        <Card style={{flex:1.6,padding:18,gap:10}}>
-          <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between'}}>
-            <SH label="Milestones" color={D.cyan}/>
-            <View style={{flexDirection:'row',gap:8}}>
-              {[{l:'Done',v:msDone,c:D.green},{l:'In Prog',v:msInP,c:D.blue},{l:'Delayed',v:msDel,c:msDel>0?D.red:D.muted}].map(item=>(
-                <View key={item.l} style={{backgroundColor:item.c+'18',borderWidth:1,borderColor:item.c+'44',
-                  paddingHorizontal:11,paddingVertical:6,borderRadius:8,alignItems:'center'}}>
-                  <Text style={{fontSize:9,color:D.muted,letterSpacing:1}}>{item.l.toUpperCase()}</Text>
-                  <Text style={{fontSize:18,fontWeight:'900',color:item.c}}>{item.v}</Text>
-                </View>
-              ))}
-            </View>
-          </View>
-          <View style={{flex:1,gap:8,justifyContent:'center'}}>
-            {phases.slice(0,6).map(phase=>{
-              const phMs=schedule.filter(m=>m.phase===phase);
-              const phDone=phMs.filter(m=>m.status==='Done').length;
-              const phPct=phMs.length>0?(phDone/phMs.length)*100:0;
-              const phCol=phPct===100?D.green:phMs.some(m=>m.status==='Delayed')?D.red:D.blue;
-              return(
-                <View key={phase} style={{gap:4}}>
-                  <View style={{flexDirection:'row',justifyContent:'space-between'}}>
-                    <Text style={{fontSize:13,color:D.text,fontWeight:'600'}} numberOfLines={1}>{phase}</Text>
-                    <Text style={{fontSize:13,color:phCol,fontWeight:'800'}}>{fmtP(phPct)}</Text>
-                  </View>
-                  <View style={{height:14,backgroundColor:D.bg,borderRadius:7}}>
-                    <View style={{height:14,width:`${phPct}%` as any,backgroundColor:phCol,borderRadius:7}}/>
-                  </View>
-                </View>
-              );
-            })}
-          </View>
-          {phases.length>6&&<ViewAllPill onPress={()=>setOpenModal('milestones')} count={phases.length} color={D.cyan}/>}
-        </Card>
       </View>
 
-      {/* ══ Milestones detail modal ══ */}
-      {openModal==='milestones'&&(
-        <DetailModal title="Milestones — All Phases" color={D.cyan} onClose={()=>setOpenModal(null)}>
-          <View style={{gap:16}}>
-            {phases.map(phase=>{
-              const phMs=schedule.filter(m=>m.phase===phase);
-              const phDone=phMs.filter(m=>m.status==='Done').length;
-              const phPct=phMs.length>0?(phDone/phMs.length)*100:0;
-              const phCol=phPct===100?D.green:phMs.some(m=>m.status==='Delayed')?D.red:D.blue;
-              return(
-                <View key={phase} style={{gap:6}}>
-                  <View style={{flexDirection:'row',justifyContent:'space-between'}}>
-                    <Text style={{fontSize:16,color:D.text,fontWeight:'700'}}>{phase}</Text>
-                    <Text style={{fontSize:16,color:phCol,fontWeight:'800'}}>{fmtP(phPct)}</Text>
-                  </View>
-                  <View style={{height:16,backgroundColor:D.bg,borderRadius:8}}>
-                    <View style={{height:16,width:`${phPct}%` as any,backgroundColor:phCol,borderRadius:8}}/>
-                  </View>
-                  <Text style={{fontSize:12,color:D.muted}}>{phDone} of {phMs.length} milestones done</Text>
-                </View>
-              );
-            })}
-          </View>
-        </DetailModal>
-      )}
-
-      {/* ══ ROW 2: EVM S-Curve | CPI/SPI Trend | Budget by Category (full) ══ */}
+      {/* ══ ROW 2: EVM S-Curve | CPI/SPI Trend (Budget by Category hidden on TV for now) ══ */}
       {evm.length>=2&&(
-        <View style={{flex:6,flexDirection:'row',gap:14}}>
-          <Card style={{flex:3,padding:22,gap:12}}>
-            <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between'}}>
+        <View style={{flex:6,flexDirection:'row',flexWrap:'wrap',gap:14}}>
+          <Card style={{flex:3,minWidth:320,padding:22,gap:12}}>
+            <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:8}}>
               <SH label="EVM S-Curve" color={color}/>
               {latestEvm&&(
-                <View style={{flexDirection:'row',gap:8}}>
+                <View style={{flexDirection:'row',gap:8,flexWrap:'wrap'}}>
                   {[
                     {l:'EAC',v:fmtM(num(latestEvm.eac_usd)),c:num(latestEvm.eac_usd)>num(latestEvm.bac_usd)?D.red:D.green},
                     {l:'CV', v:(num(latestEvm.cv_usd)>=0?'+':'')+fmtM(num(latestEvm.cv_usd)),c:num(latestEvm.cv_usd)>=0?D.green:D.red},
@@ -757,7 +686,7 @@ function ProjectDashboardTV({p,data,color}:{p:Project;data:SheetData;color:strin
             />}</ChartBox2>
             <Legend items={[{label:'Planned Value',color:D.blue},{label:'Earned Value',color:D.green},{label:'Actual Cost',color:D.red}]}/>
           </Card>
-          <Card style={{flex:2,padding:22,gap:12}}>
+          <Card style={{flex:2,minWidth:260,padding:22,gap:12}}>
             <SH label="CPI & SPI Trend" color={color}/>
             <ChartBox2>{(cw,ch)=><LineCurve
               series={[{data:cpiS,color:D.green,strokeWidth:3},{data:spiS,color:D.yellow,strokeWidth:3}]}
@@ -765,74 +694,7 @@ function ProjectDashboardTV({p,data,color}:{p:Project;data:SheetData;color:strin
             />}</ChartBox2>
             <Legend items={[{label:'CPI',color:D.green},{label:'SPI',color:D.yellow},{label:'1.0',color:D.muted}]}/>
           </Card>
-          <Card style={{flex:1.8,padding:18,gap:10}}>
-            <SH label="Budget by Category" color={D.orange}/>
-            <View style={{alignItems:'center'}}>
-              <Donut
-                slices={catData.map((c,i)=>({v:c.ac,c:DC[i%DC.length]}))}
-                size={108}
-                label={fmtM(catData.reduce((s,c)=>s+c.ac,0))}
-                sublabel="actual"
-              />
-            </View>
-            <View style={{flex:1,gap:9}}>
-                {catData.slice(0,5).map((c,i)=>{
-                  const over=c.ac>c.pl;
-                  const pct=c.pl>0?Math.round((c.ac/c.pl)*100):0;
-                  return(
-                    <View key={c.cat} style={{gap:4}}>
-                      <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between'}}>
-                        <View style={{flexDirection:'row',alignItems:'center',gap:7,flex:1}}>
-                          <View style={{width:9,height:9,borderRadius:4.5,backgroundColor:DC[i%DC.length]}}/>
-                          <Text style={{fontSize:13,color:D.text,flex:1,fontWeight:'600'}} numberOfLines={1}>{c.cat}</Text>
-                        </View>
-                        <Text style={{fontSize:13,fontWeight:'800',color:over?D.red:D.green}}>{pct}%</Text>
-                      </View>
-                      <View style={{height:14,backgroundColor:D.bg,borderRadius:7,overflow:'hidden'}}>
-                        <View style={{height:14,width:`${Math.min(pct,100)}%` as any,backgroundColor:over?D.red:DC[i%DC.length],borderRadius:7}}/>
-                      </View>
-                    </View>
-                  );
-                })}
-            </View>
-            {catData.length>5&&<ViewAllPill onPress={()=>setOpenModal('budget')} count={catData.length} color={D.orange}/>}
-          </Card>
         </View>
-      )}
-
-      {/* ══ Budget by Category detail modal ══ */}
-      {openModal==='budget'&&(
-        <DetailModal title="Budget by Category — Full Breakdown" color={D.orange} onClose={()=>setOpenModal(null)}>
-          <View style={{alignItems:'center',marginBottom:20}}>
-            <Donut
-              slices={catData.map((c,i)=>({v:c.ac,c:DC[i%DC.length]}))}
-              size={160}
-              label={fmtM(catData.reduce((s,c)=>s+c.ac,0))}
-              sublabel="actual"
-            />
-          </View>
-          <View style={{gap:14}}>
-            {catData.map((c,i)=>{
-              const over=c.ac>c.pl;
-              const pct=c.pl>0?Math.round((c.ac/c.pl)*100):0;
-              return(
-                <View key={c.cat} style={{gap:6}}>
-                  <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between'}}>
-                    <View style={{flexDirection:'row',alignItems:'center',gap:8,flex:1}}>
-                      <View style={{width:11,height:11,borderRadius:5.5,backgroundColor:DC[i%DC.length]}}/>
-                      <Text style={{fontSize:15,color:D.text,flex:1,fontWeight:'600'}} numberOfLines={1}>{c.cat}</Text>
-                    </View>
-                    <Text style={{fontSize:13,color:D.muted,marginRight:10}}>{fmtM(c.ac)} / {fmtM(c.pl)}</Text>
-                    <Text style={{fontSize:15,fontWeight:'800',color:over?D.red:D.green}}>{pct}%</Text>
-                  </View>
-                  <View style={{height:16,backgroundColor:D.bg,borderRadius:8,overflow:'hidden'}}>
-                    <View style={{height:16,width:`${Math.min(pct,100)}%` as any,backgroundColor:over?D.red:DC[i%DC.length],borderRadius:8}}/>
-                  </View>
-                </View>
-              );
-            })}
-          </View>
-        </DetailModal>
       )}
 
     </View>
@@ -1401,11 +1263,46 @@ function AddProjectModal({onAdd,onClose}:{onAdd:(entry:SheetEntry)=>void;onClose
   );
 }
 
+// Small per-half project switcher used by the TV split-screen — lets each
+// side pick which project it shows, independently of the other side.
+function TVSideSelector({tabs,activeIdx,onSelect,PC}:{tabs:{id:string;label:string}[];activeIdx:number;onSelect:(i:number)=>void;PC:string[]}) {
+  const {D} = useTheme();
+  return(
+    <View style={{flexDirection:'row',flexWrap:'wrap',gap:6,paddingHorizontal:14,paddingVertical:8,
+      borderBottomWidth:1,borderBottomColor:D.border,backgroundColor:D.panel}}>
+      {tabs.map((tab,i)=>{
+        const on=i===activeIdx;
+        const col=PC[i%3];
+        return(
+          <TouchableOpacity key={tab.id+i} onPress={()=>onSelect(i)}
+            style={{flexDirection:'row',alignItems:'center',gap:6,paddingHorizontal:10,paddingVertical:5,
+              borderRadius:6,borderWidth:1,borderColor:on?col:D.border,backgroundColor:on?col+'18':D.bg}}>
+            <View style={{width:6,height:6,borderRadius:3,backgroundColor:on?col:D.muted}}/>
+            <Text style={{fontSize:11,fontWeight:'800',color:on?D.text:D.sub}}>{tab.label}</Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+}
+
+function TVEmptySide() {
+  const {D} = useTheme();
+  return(
+    <View style={{flex:1,alignItems:'center',justifyContent:'center',gap:8}}>
+      <Text style={{fontSize:14,color:D.muted,fontWeight:'700'}}>No project selected</Text>
+      <Text style={{fontSize:12,color:D.muted}}>Add another project to fill this side</Text>
+    </View>
+  );
+}
+
 function WebLayout({sheets,setSheets,token}:{sheets:SheetEntry[];setSheets:(s:SheetEntry[]|((_:SheetEntry[])=>SheetEntry[]))=>void;token:string}) {
   const {D,isDark,toggleTheme} = useTheme();
   const PC = getPC(D);
   const [activeIdx,setActiveIdx]=useState(0);
   const [tvMode,setTvMode]=useState(false);
+  const [tvLeftIdx,setTvLeftIdx]=useState(0);
+  const [tvRightIdx,setTvRightIdx]=useState(1);
   const [showAdd,setShowAdd]=useState(false);
   const [confirmRemove,setConfirmRemove]=useState<{idx:number;label:string}|null>(null);
 
@@ -1487,39 +1384,42 @@ function WebLayout({sheets,setSheets,token}:{sheets:SheetEntry[];setSheets:(s:Sh
             <Logo size={tvMode?"default":"small"}/>
           </View>
 
-          {/* Project tabs */}
-          <View style={{flex:1,flexDirection:'row',alignItems:'center'}}>
-            {allTabs.map((tab,i)=>{
-              const on=i===activeIdx;
-              const col=PC[i%3];
-              return(
-                <View key={tab.id+i} style={{flexDirection:'row',alignItems:'center'}}>
-                  <TouchableOpacity onPress={()=>setActiveIdx(i)}
-                    style={{paddingHorizontal:tvMode?14:20,paddingVertical:tvMode?9:14,borderBottomWidth:3,
-                      borderBottomColor:on?col:'transparent',marginBottom:-1,
-                      flexDirection:'row',alignItems:'center',gap:7}}>
-                    <View style={{width:7,height:7,borderRadius:3.5,backgroundColor:on?col:D.muted}}/>
-                    <Text style={{fontSize:tvMode?12:13,fontWeight:'800',letterSpacing:0.3,color:on?D.text:D.sub}}>{tab.label}</Text>
-                  </TouchableOpacity>
-                  {/* Remove button — shows confirm dialog */}
-                  {!tab.isDefault&&on&&(
-                    <TouchableOpacity onPress={()=>setConfirmRemove({idx:i,label:tab.label})}
-                      style={{width:18,height:18,borderRadius:9,backgroundColor:D.redDim,
-                        borderWidth:1,borderColor:D.red,alignItems:'center',justifyContent:'center',marginLeft:-4}}>
-                      <Text style={{fontSize:11,color:D.red,fontWeight:'900',lineHeight:13}}>×</Text>
+          {/* Project tabs — hidden in TV mode, where each half picks its own project */}
+          {!tvMode && (
+            <View style={{flex:1,flexDirection:'row',alignItems:'center'}}>
+              {allTabs.map((tab,i)=>{
+                const on=i===activeIdx;
+                const col=PC[i%3];
+                return(
+                  <View key={tab.id+i} style={{flexDirection:'row',alignItems:'center'}}>
+                    <TouchableOpacity onPress={()=>setActiveIdx(i)}
+                      style={{paddingHorizontal:20,paddingVertical:14,borderBottomWidth:3,
+                        borderBottomColor:on?col:'transparent',marginBottom:-1,
+                        flexDirection:'row',alignItems:'center',gap:7}}>
+                      <View style={{width:7,height:7,borderRadius:3.5,backgroundColor:on?col:D.muted}}/>
+                      <Text style={{fontSize:13,fontWeight:'800',letterSpacing:0.3,color:on?D.text:D.sub}}>{tab.label}</Text>
                     </TouchableOpacity>
-                  )}
-                </View>
-              );
-            })}
-            <TouchableOpacity onPress={()=>setShowAdd(true)}
-              style={{paddingHorizontal:12,paddingVertical:8,marginLeft:4,
-                flexDirection:'row',alignItems:'center',gap:5,
-                borderRadius:6,borderWidth:1,borderColor:D.border,backgroundColor:D.bg,marginBottom:4}}>
-              <Text style={{fontSize:16,color:D.accent,fontWeight:'800',lineHeight:18}}>+</Text>
-              <Text style={{fontSize:11,color:D.accent,fontWeight:'700',letterSpacing:0.5}}>Add Sheet</Text>
-            </TouchableOpacity>
-          </View>
+                    {/* Remove button — shows confirm dialog */}
+                    {!tab.isDefault&&on&&(
+                      <TouchableOpacity onPress={()=>setConfirmRemove({idx:i,label:tab.label})}
+                        style={{width:18,height:18,borderRadius:9,backgroundColor:D.redDim,
+                          borderWidth:1,borderColor:D.red,alignItems:'center',justifyContent:'center',marginLeft:-4}}>
+                        <Text style={{fontSize:11,color:D.red,fontWeight:'900',lineHeight:13}}>×</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                );
+              })}
+              <TouchableOpacity onPress={()=>setShowAdd(true)}
+                style={{paddingHorizontal:12,paddingVertical:8,marginLeft:4,
+                  flexDirection:'row',alignItems:'center',gap:5,
+                  borderRadius:6,borderWidth:1,borderColor:D.border,backgroundColor:D.bg,marginBottom:4}}>
+                <Text style={{fontSize:16,color:D.accent,fontWeight:'800',lineHeight:18}}>+</Text>
+                <Text style={{fontSize:11,color:D.accent,fontWeight:'700',letterSpacing:0.5}}>Add Sheet</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+          {tvMode && <View style={{flex:1}}/>}
 
           {/* Theme + TV toggles */}
           <View style={{flexDirection:'row',alignItems:'center',gap:8}}>
@@ -1542,8 +1442,25 @@ function WebLayout({sheets,setSheets,token}:{sheets:SheetEntry[];setSheets:(s:Sh
         </View>
       </View>
 
-      {/* Dashboard content — all tabs load via ProjectTab */}
-      {activeTab && <ProjectTab sheetId={activeTab.id} color={color} tvMode={tvMode}/>}
+      {/* Dashboard content */}
+      {tvMode ? (
+        <View style={{flex:1,flexDirection:'row'}}>
+          <View style={{flex:1,borderRightWidth:1,borderRightColor:D.border}}>
+            <TVSideSelector tabs={allTabs} activeIdx={tvLeftIdx} onSelect={setTvLeftIdx} PC={PC}/>
+            {allTabs[tvLeftIdx]
+              ? <ProjectTab sheetId={allTabs[tvLeftIdx].id} color={PC[tvLeftIdx%3]} tvMode={true}/>
+              : <TVEmptySide/>}
+          </View>
+          <View style={{flex:1}}>
+            <TVSideSelector tabs={allTabs} activeIdx={tvRightIdx} onSelect={setTvRightIdx} PC={PC}/>
+            {allTabs[tvRightIdx]
+              ? <ProjectTab sheetId={allTabs[tvRightIdx].id} color={PC[tvRightIdx%3]} tvMode={true}/>
+              : <TVEmptySide/>}
+          </View>
+        </View>
+      ) : (
+        activeTab && <ProjectTab sheetId={activeTab.id} color={color} tvMode={false}/>
+      )}
 
       {/* Add sheet modal */}
       {showAdd&&<AddProjectModal onAdd={handleAddSheet} onClose={()=>setShowAdd(false)}/>}
