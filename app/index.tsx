@@ -49,7 +49,7 @@ function Logo({size='default'}:{size?:'small'|'default'|'large'}) {
     />
   ) : (
     <Image 
-      source={require('../public/iskerlogo.png')} 
+      source={require('../assets/iskerlogo.png')} 
       style={{width: s.w, height: s.h, resizeMode: 'contain'}} 
     />
   );
@@ -1344,7 +1344,7 @@ function WebLayout({sheets,setSheets,token}:{sheets:SheetEntry[];setSheets:(s:Sh
   const color = PC[activeIdx%3];
 
   return(
-    <View style={{flex:1,backgroundColor:D.bg}}>
+    <View style={{flex:1,height:'100vh' as any,backgroundColor:D.bg}}>
       <Stack.Screen options={{headerShown:false}}/>
 
       {/* Confirm remove modal */}
