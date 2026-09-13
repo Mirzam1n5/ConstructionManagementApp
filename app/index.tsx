@@ -49,7 +49,7 @@ function Logo({size='default'}:{size?:'small'|'default'|'large'}) {
     />
   ) : (
     <Image 
-      source={require('../assets/iskerlogo.png')} 
+      source={require('../public/iskerlogo.png')} 
       style={{width: s.w, height: s.h, resizeMode: 'contain'}} 
     />
   );
@@ -633,7 +633,7 @@ function ProjectDashboardTV({p,data,color}:{p:Project;data:SheetData;color:strin
         {/* Gauge */}
         <Card style={{flex:1.4,minWidth:220,padding:14,alignItems:'center',justifyContent:'center'}}>
           <ChartBox2>{(cw,ch)=>{
-            const size=Math.min(cw,ch/0.72)*0.98;
+            const size=Math.min(cw,ch/0.72,260)*0.98;
             return(
               <View style={{flex:1,alignItems:'center',justifyContent:'center'}}>
                 <ArcGauge pct={prog} color={color} size={size} label={fmtP(prog)} sublabel="complete"/>
