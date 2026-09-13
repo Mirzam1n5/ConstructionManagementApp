@@ -49,7 +49,7 @@ function Logo({size='default'}:{size?:'small'|'default'|'large'}) {
     />
   ) : (
     <Image 
-      source={require('../assets/iskerlogo.png')} 
+      source={require('../public/iskerlogo.png')} 
       style={{width: s.w, height: s.h, resizeMode: 'contain'}} 
     />
   );
@@ -567,7 +567,7 @@ function ProjectDashboardTV({p,data,color}:{p:Project;data:SheetData;color:strin
     : ((deviationDays??0)>0?D.red:D.green);
 
   return(
-    <View style={{flex:1,gap:14}}>
+    <View style={{flex:1,gap:14,backgroundColor:'red'} as any}>
 
       {/* ══ HEADER STRIP ══ */}
       <Card style={{borderLeftWidth:5,borderLeftColor:color,paddingVertical:14,paddingHorizontal:22,gap:10}}>
@@ -1135,7 +1135,7 @@ function ProjectTab({sheetId,color,tvMode}:{sheetId:string;color:string;tvMode:b
   );
 
   if(tvMode) return(
-    <View style={{flex:1,padding:12}}>
+    <View style={{flex:1,padding:12,backgroundColor:'purple'} as any}>
       <ProjectDashboardTV p={p} data={data} color={color}/>
     </View>
   );
@@ -1345,7 +1345,7 @@ function WebLayout({sheets,setSheets,token}:{sheets:SheetEntry[];setSheets:(s:Sh
   const color = PC[activeIdx%3];
 
   return(
-    <View style={{flex:1,height:winH,backgroundColor:D.bg}}>
+    <View style={{flex:1,height:winH,backgroundColor:'blue'} as any}>
       <Stack.Screen options={{headerShown:false}}/>
 
       {/* Confirm remove modal */}
@@ -1445,15 +1445,14 @@ function WebLayout({sheets,setSheets,token}:{sheets:SheetEntry[];setSheets:(s:Sh
 
       {/* Dashboard content */}
       {tvMode ? (
-        <View style={{flex:1,flexDirection:'row'}}>
-          <View style={{flex:1,borderRightWidth:1,borderRightColor:D.border}}>
+        <View style={{flex:1,flexDirection:'row',backgroundColor:'yellow'} as any}>
+          <View style={{flex:1,borderRightWidth:1,borderRightColor:D.border,backgroundColor:'lime'} as any}>
             <TVSideSelector tabs={allTabs} activeIdx={tvLeftIdx} onSelect={setTvLeftIdx} PC={PC}/>
             {allTabs[tvLeftIdx]
               ? <ProjectTab sheetId={allTabs[tvLeftIdx].id} color={PC[tvLeftIdx%3]} tvMode={true}/>
               : <TVEmptySide/>}
           </View>
-          <View style={{flex:1}}>
-            <TVSideSelector tabs={allTabs} activeIdx={tvRightIdx} onSelect={setTvRightIdx} PC={PC}/>
+          <View style={{flex:1,backgroundColor:'lime'} as any}>
             {allTabs[tvRightIdx]
               ? <ProjectTab sheetId={allTabs[tvRightIdx].id} color={PC[tvRightIdx%3]} tvMode={true}/>
               : <TVEmptySide/>}
