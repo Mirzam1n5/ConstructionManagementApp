@@ -49,7 +49,7 @@ function Logo({size='default'}:{size?:'small'|'default'|'large'}) {
     />
   ) : (
     <Image 
-      source={require('../public/iskerlogo.png')} 
+      source={require('../assets/iskerlogo.png')} 
       style={{width: s.w, height: s.h, resizeMode: 'contain'}} 
     />
   );
@@ -567,7 +567,7 @@ function ProjectDashboardTV({p,data,color}:{p:Project;data:SheetData;color:strin
     : ((deviationDays??0)>0?D.red:D.green);
 
   return(
-    <View style={{flex:1,gap:14,backgroundColor:'red'} as any}>
+    <View style={{flex:1,gap:14}}>
 
       {/* ══ HEADER STRIP ══ */}
       <Card style={{borderLeftWidth:5,borderLeftColor:color,paddingVertical:14,paddingHorizontal:22,gap:10}}>
@@ -628,7 +628,7 @@ function ProjectDashboardTV({p,data,color}:{p:Project;data:SheetData;color:strin
       </Card>
 
       {/* ══ ROW 1: Gauge | CPI/SPI tiles (Milestones hidden on TV for now) ══ */}
-      <View style={{flex:5,flexDirection:'row',flexWrap:'wrap',gap:14}}>
+      <View style={{flex:5,flexDirection:'row',flexWrap:'wrap',alignContent:'stretch',gap:14}}>
 
         {/* Gauge */}
         <Card style={{flex:1.4,minWidth:220,padding:14,alignItems:'center',justifyContent:'center'}}>
@@ -661,7 +661,7 @@ function ProjectDashboardTV({p,data,color}:{p:Project;data:SheetData;color:strin
 
       {/* ══ ROW 2: EVM S-Curve | CPI/SPI Trend (Budget by Category hidden on TV for now) ══ */}
       {evm.length>=2&&(
-        <View style={{flex:6,flexDirection:'row',flexWrap:'wrap',gap:14}}>
+        <View style={{flex:6,flexDirection:'row',flexWrap:'wrap',alignContent:'stretch',gap:14}}>
           <Card style={{flex:3,minWidth:320,padding:22,gap:12}}>
             <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:8}}>
               <SH label="EVM S-Curve" color={color}/>
@@ -1135,7 +1135,7 @@ function ProjectTab({sheetId,color,tvMode}:{sheetId:string;color:string;tvMode:b
   );
 
   if(tvMode) return(
-    <View style={{flex:1,padding:12,backgroundColor:'purple'} as any}>
+    <View style={{flex:1,padding:12}}>
       <ProjectDashboardTV p={p} data={data} color={color}/>
     </View>
   );
@@ -1345,7 +1345,7 @@ function WebLayout({sheets,setSheets,token}:{sheets:SheetEntry[];setSheets:(s:Sh
   const color = PC[activeIdx%3];
 
   return(
-    <View style={{flex:1,height:winH,backgroundColor:'blue'} as any}>
+    <View style={{flex:1,height:winH,backgroundColor:D.bg}}>
       <Stack.Screen options={{headerShown:false}}/>
 
       {/* Confirm remove modal */}
@@ -1445,14 +1445,14 @@ function WebLayout({sheets,setSheets,token}:{sheets:SheetEntry[];setSheets:(s:Sh
 
       {/* Dashboard content */}
       {tvMode ? (
-        <View style={{flex:1,flexDirection:'row',backgroundColor:'yellow'} as any}>
-          <View style={{flex:1,borderRightWidth:1,borderRightColor:D.border,backgroundColor:'lime'} as any}>
+        <View style={{flex:1,flexDirection:'row'}}>
+          <View style={{flex:1,borderRightWidth:1,borderRightColor:D.border}}>
             <TVSideSelector tabs={allTabs} activeIdx={tvLeftIdx} onSelect={setTvLeftIdx} PC={PC}/>
             {allTabs[tvLeftIdx]
               ? <ProjectTab sheetId={allTabs[tvLeftIdx].id} color={PC[tvLeftIdx%3]} tvMode={true}/>
               : <TVEmptySide/>}
           </View>
-          <View style={{flex:1,backgroundColor:'lime'} as any}>
+          <View style={{flex:1}}>
             {allTabs[tvRightIdx]
               ? <ProjectTab sheetId={allTabs[tvRightIdx].id} color={PC[tvRightIdx%3]} tvMode={true}/>
               : <TVEmptySide/>}
