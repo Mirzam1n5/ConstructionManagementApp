@@ -49,7 +49,7 @@ function Logo({size='default'}:{size?:'small'|'default'|'large'}) {
     />
   ) : (
     <Image 
-      source={require('../public/iskerlogo.png')} 
+      source={require('../assets/iskerlogo.png')} 
       style={{width: s.w, height: s.h, resizeMode: 'contain'}} 
     />
   );
@@ -1453,6 +1453,7 @@ function WebLayout({sheets,setSheets,token}:{sheets:SheetEntry[];setSheets:(s:Sh
               : <TVEmptySide/>}
           </View>
           <View style={{flex:1}}>
+            <TVSideSelector tabs={allTabs} activeIdx={tvRightIdx} onSelect={setTvRightIdx} PC={PC}/>
             {allTabs[tvRightIdx]
               ? <ProjectTab sheetId={allTabs[tvRightIdx].id} color={PC[tvRightIdx%3]} tvMode={true}/>
               : <TVEmptySide/>}
