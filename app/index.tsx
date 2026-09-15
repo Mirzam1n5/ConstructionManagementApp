@@ -35,6 +35,7 @@ function authHeaders(token: string) {
 // Displays logo.png (horizontal 810×220) with adaptive sizing for mobile and web
 // Maintains 3.68:1 aspect ratio
 function Logo({size='default'}:{size?:'small'|'default'|'large'}) {
+  const {isDark} = useTheme();
   const sizeMap = {
     small:   { h: 24, w: 88 },    // For mobile header
     default: { h: 32, w: 118 },   // For web tab bar
@@ -43,13 +44,13 @@ function Logo({size='default'}:{size?:'small'|'default'|'large'}) {
   const s = sizeMap[size];
   return Platform.OS === 'web' ? (
     <img 
-      src="/iskerlogo.png"
+      src={isDark ? "/iskerlogo-light.png" : "/iskerlogo.png"}
       style={{width: s.w, height: s.h, objectFit: 'contain', display: 'block'}} 
       alt="ISKER Logo"
     />
   ) : (
     <Image 
-      source={require('../assets/iskerlogo.png')} 
+      source={isDark ? require('../public/iskerlogo-light.png') : require('../public/iskerlogo.png')} 
       style={{width: s.w, height: s.h, resizeMode: 'contain'}} 
     />
   );
