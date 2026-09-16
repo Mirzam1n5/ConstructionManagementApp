@@ -675,11 +675,11 @@ function ProjectDashboardTV({p,data,color}:{p:Project;data:SheetData;color:strin
         </View>
       </Card>
 
-      {/* ══ ROW 1: Gauge | CPI/SPI tiles (Milestones hidden on TV for now) ══ */}
+      {/* ══ ROW 1: Gauge | CPI/SPI tiles | Camera placeholder (Milestones hidden on TV for now) ══ */}
       <View style={{flex:5,flexDirection:'row',flexWrap:'wrap',alignContent:'stretch',gap:14}}>
 
         {/* Gauge */}
-        <Card style={{flex:1.4,minWidth:220,padding:14,alignItems:'center',justifyContent:'center'}}>
+        <Card style={{flex:1.2,minWidth:200,padding:14,alignItems:'center',justifyContent:'center'}}>
           <ChartBox2>{(cw,ch)=>{
             const size=Math.min(cw,ch/0.72,260)*0.98;
             return(
@@ -691,7 +691,7 @@ function ProjectDashboardTV({p,data,color}:{p:Project;data:SheetData;color:strin
         </Card>
 
         {/* CPI / SPI large tiles */}
-        <View style={{flex:1,minWidth:180,gap:12}}>
+        <View style={{flex:0.9,minWidth:170,gap:12}}>
           <Card style={{flex:1,alignItems:'center',justifyContent:'center',gap:3,
             backgroundColor:cpi>=1?D.greenDim:D.redDim,borderColor:cpi>=1?D.green:D.red}}>
             <Text style={{fontSize:11,color:D.sub,letterSpacing:1.5}}>CPI</Text>
@@ -705,6 +705,18 @@ function ProjectDashboardTV({p,data,color}:{p:Project;data:SheetData;color:strin
             <Text style={{fontSize:11,color:iCol(D,spi),fontWeight:'700'}}>{spi>=1?'ON SCHEDULE':'BEHIND'}</Text>
           </Card>
         </View>
+
+        {/* Camera placeholder — reserved spot for a live site-camera feed.
+            Not wired up to anything yet; swap the dashed box below for a
+            <video>/WebView/img element once a camera source is chosen. */}
+        <Card style={{flex:1.3,minWidth:220,padding:14,gap:10}}>
+          <SH label="Site Camera" color={D.cyan}/>
+          <View style={{flex:1,backgroundColor:D.bg,borderRadius:10,borderWidth:1,borderColor:D.border,
+            borderStyle:'dashed' as any,alignItems:'center',justifyContent:'center',gap:8}}>
+            <Ionicons name="videocam-outline" size={32} color={D.muted}/>
+            <Text style={{fontSize:11,color:D.muted,letterSpacing:0.5}}>No feed connected</Text>
+          </View>
+        </Card>
       </View>
 
       {/* ══ ROW 2: EVM S-Curve | CPI/SPI Trend (Budget by Category hidden on TV for now) ══ */}
