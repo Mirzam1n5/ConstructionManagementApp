@@ -468,12 +468,16 @@ const TV_REF_W = 1150;
 const TV_REF_H = 830;
 function TVScaleToFit({children}:{children:React.ReactNode}) {
   const [box,setBox]=useState({w:0,h:0});
-  const scale = box.w>0 && box.h>0
-    ? Math.min(box.w/TV_REF_W, box.h/TV_REF_H)
-    : 1;
+  // Independent X/Y scale factors: stretches the fixed reference frame to
+  // exactly match the container's real width and height, so the dashboard
+  // always fills the available space with no letterboxing (blank strips)
+  // and — since it's stretched to fit rather than clipped — no cut-off or
+  // overlapping content on TVs whose aspect ratio differs from TV_REF_W/H.
+  const scaleX = box.w>0 ? box.w/TV_REF_W : 1;
+  const scaleY = box.h>0 ? box.h/TV_REF_H : 1;
   return (
     <View
-      style={{flex:1,overflow:'hidden',alignItems:'center',justifyContent:'flex-start'}}
+      style={{flex:1,overflow:'hidden',alignItems:'flex-start',justifyContent:'flex-start'}}
       onLayout={e=>{
         const {width,height}=e.nativeEvent.layout;
         setBox({w:Math.floor(width),h:Math.floor(height)});
@@ -483,7 +487,7 @@ function TVScaleToFit({children}:{children:React.ReactNode}) {
         <View style={{
           width:TV_REF_W,
           height:TV_REF_H,
-          transform:[{scale}] as any,
+          transform:[{scaleX},{scaleY}] as any,
         }}>
           {children}
         </View>
