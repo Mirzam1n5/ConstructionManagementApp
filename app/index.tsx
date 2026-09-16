@@ -16,15 +16,26 @@ const apiUrl = (path: string) => Platform.OS === 'web' ? path : `${API_BASE}${pa
 const TOKEN_KEY = 'isker_auth_token';
 
 async function getToken(): Promise<string | null> {
-  if (Platform.OS === 'web') return localStorage.getItem(TOKEN_KEY);
+  if (Platform.OS === 'web') {
+    try { return localStorage.getItem(TOKEN_KEY); }
+    catch (e) { console.error('localStorage.getItem failed — storage may be blocked/disabled on this device', e); return null; }
+  }
   return getJSON<string>(TOKEN_KEY, null as any);
 }
 async function saveToken(t: string) {
-  if (Platform.OS === 'web') { localStorage.setItem(TOKEN_KEY, t); return; }
+  if (Platform.OS === 'web') {
+    try { localStorage.setItem(TOKEN_KEY, t); }
+    catch (e) { console.error('localStorage.setItem failed — token will not persist on this device', e); }
+    return;
+  }
   setJSON(TOKEN_KEY, t);
 }
 async function clearToken() {
-  if (Platform.OS === 'web') { localStorage.removeItem(TOKEN_KEY); return; }
+  if (Platform.OS === 'web') {
+    try { localStorage.removeItem(TOKEN_KEY); }
+    catch (e) { console.error('localStorage.removeItem failed', e); }
+    return;
+  }
   setJSON(TOKEN_KEY, null);
 }
 
@@ -446,6 +457,37 @@ function ChartBox2({children}:{children:(w:number,h:number)=>React.ReactNode}) {
       setSize({w:Math.floor(width),h:Math.floor(height)});
     }}>
       {size.w>0&&size.h>0?children(size.w,size.h):null}
+    </View>
+  );
+}
+
+// ── TVScaleToFit: scales fixed-size content (like a slide) to always fit ──
+// available space, so it never needs scrolling on any TV/screen size —
+// it shrinks or grows the whole thing uniformly instead of reflowing pieces.
+const TV_REF_W = 1150;
+const TV_REF_H = 830;
+function TVScaleToFit({children}:{children:React.ReactNode}) {
+  const [box,setBox]=useState({w:0,h:0});
+  const scale = box.w>0 && box.h>0
+    ? Math.min(box.w/TV_REF_W, box.h/TV_REF_H)
+    : 1;
+  return (
+    <View
+      style={{flex:1,overflow:'hidden',alignItems:'center',justifyContent:'center'}}
+      onLayout={e=>{
+        const {width,height}=e.nativeEvent.layout;
+        setBox({w:Math.floor(width),h:Math.floor(height)});
+      }}
+    >
+      {box.w>0 && (
+        <View style={{
+          width:TV_REF_W,
+          height:TV_REF_H,
+          transform:[{scale}] as any,
+        }}>
+          {children}
+        </View>
+      )}
     </View>
   );
 }
@@ -1137,7 +1179,9 @@ function ProjectTab({sheetId,color,tvMode}:{sheetId:string;color:string;tvMode:b
 
   if(tvMode) return(
     <View style={{flex:1,padding:12}}>
-      <ProjectDashboardTV p={p} data={data} color={color}/>
+      <TVScaleToFit>
+        <ProjectDashboardTV p={p} data={data} color={color}/>
+      </TVScaleToFit>
     </View>
   );
 
