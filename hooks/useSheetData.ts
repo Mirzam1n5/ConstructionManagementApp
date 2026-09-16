@@ -133,12 +133,15 @@ export interface SheetData {
 // ─── Fetch helpers ───────────────────────────────────────────────
 function sheetUrl(sheetName: string, sheetId: string): string {
   const encoded = encodeURIComponent(sheetName);
-  return `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&sheet=${encoded}`;
+  // Cache-bust with a timestamp: Google's gviz endpoint and/or the browser's
+  // own HTTP cache can otherwise serve a stale snapshot of a tab for a
+  // while, even after the sheet has been edited and the page reloaded.
+  return `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&sheet=${encoded}&_ts=${Date.now()}`;
 }
 
 async function fetchSheet<T>(sheetName: string, sheetId: string): Promise<T[]> {
   const url = sheetUrl(sheetName, sheetId);
-  const res = await fetch(url);
+  const res = await fetch(url, { cache: 'no-store' });
   const text = await res.text();
   const json = JSON.parse(text.substring(47, text.length - 2));
   const cols: string[] = json.table.cols.map((c: any) => c.label as string);
