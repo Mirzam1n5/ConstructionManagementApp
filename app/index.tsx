@@ -676,7 +676,7 @@ function ProjectDashboardTV({p,data,color}:{p:Project;data:SheetData;color:strin
       </Card>
 
       {/* ══ ROW 1: Gauge | CPI/SPI tiles | Camera placeholder (Milestones hidden on TV for now) ══ */}
-      <View style={{flex:5,flexDirection:'row',flexWrap:'wrap',alignContent:'stretch',gap:14}}>
+      <View style={{flex:5.6,flexDirection:'row',flexWrap:'wrap',alignContent:'stretch',gap:14}}>
 
         {/* Gauge */}
         <Card style={{flex:1.2,minWidth:200,padding:14,alignItems:'center',justifyContent:'center'}}>
@@ -721,7 +721,7 @@ function ProjectDashboardTV({p,data,color}:{p:Project;data:SheetData;color:strin
 
       {/* ══ ROW 2: EVM S-Curve | CPI/SPI Trend (Budget by Category hidden on TV for now) ══ */}
       {evm.length>=2&&(
-        <View style={{flex:6,flexDirection:'row',flexWrap:'wrap',alignContent:'stretch',gap:14}}>
+        <View style={{flex:5.4,flexDirection:'row',flexWrap:'wrap',alignContent:'stretch',gap:14}}>
           <Card style={{flex:3,minWidth:320,padding:22,gap:12}}>
             <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:8}}>
               <SH label="EVM S-Curve" color={color}/>
