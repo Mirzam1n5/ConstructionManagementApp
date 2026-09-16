@@ -707,14 +707,25 @@ function ProjectDashboardTV({p,data,color}:{p:Project;data:SheetData;color:strin
         </View>
 
         {/* Camera placeholder — reserved spot for a live site-camera feed.
-            Not wired up to anything yet; swap the dashed box below for a
-            <video>/WebView/img element once a camera source is chosen. */}
+            For now, on web this plays a public sample video on loop just so
+            you can see how a live feed will look/fit; swap the <video> src
+            below for a real RTSP/HLS/WebRTC source once a camera is chosen. */}
         <Card style={{flex:1.3,minWidth:220,padding:14,gap:10}}>
           <SH label="Site Camera" color={D.cyan}/>
-          <View style={{flex:1,backgroundColor:D.bg,borderRadius:10,borderWidth:1,borderColor:D.border,
-            borderStyle:'dashed' as any,alignItems:'center',justifyContent:'center',gap:8}}>
-            <Ionicons name="videocam-outline" size={32} color={D.muted}/>
-            <Text style={{fontSize:11,color:D.muted,letterSpacing:0.5}}>No feed connected</Text>
+          <View style={{flex:1,backgroundColor:D.bg,borderRadius:10,overflow:'hidden',
+            borderWidth:1,borderColor:D.border,alignItems:'center',justifyContent:'center'}}>
+            {Platform.OS==='web' ? (
+              <video
+                src="https://assets.mixkit.co/videos/4010/4010-360.mp4"
+                autoPlay muted loop playsInline
+                style={{width:'100%',height:'100%',objectFit:'cover',borderRadius:10}}
+              />
+            ) : (
+              <View style={{alignItems:'center',justifyContent:'center',gap:8}}>
+                <Ionicons name="videocam-outline" size={32} color={D.muted}/>
+                <Text style={{fontSize:11,color:D.muted,letterSpacing:0.5}}>No feed connected</Text>
+              </View>
+            )}
           </View>
         </Card>
       </View>
