@@ -473,7 +473,7 @@ function TVScaleToFit({children}:{children:React.ReactNode}) {
     : 1;
   return (
     <View
-      style={{flex:1,overflow:'hidden',alignItems:'center',justifyContent:'center'}}
+      style={{flex:1,overflow:'hidden',alignItems:'center',justifyContent:'flex-start'}}
       onLayout={e=>{
         const {width,height}=e.nativeEvent.layout;
         setBox({w:Math.floor(width),h:Math.floor(height)});
