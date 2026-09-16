@@ -1302,7 +1302,7 @@ function WebLayout({sheets,setSheets,token}:{sheets:SheetEntry[];setSheets:(s:Sh
   const {height:winH} = useWindowDimensions();
   const PC = getPC(D);
   const [activeIdx,setActiveIdx]=useState(0);
-  const [tvMode,setTvMode]=useState(false);
+  const [tvMode,setTvMode]=useState(true);
   const [tvLeftIdx,setTvLeftIdx]=useState(0);
   const [tvRightIdx,setTvRightIdx]=useState(1);
   const [showAdd,setShowAdd]=useState(false);
