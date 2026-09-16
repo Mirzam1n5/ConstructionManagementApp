@@ -488,6 +488,7 @@ function TVScaleToFit({children}:{children:React.ReactNode}) {
           width:TV_REF_W,
           height:TV_REF_H,
           transform:[{scaleX},{scaleY}] as any,
+          transformOrigin:'top left' as any,
         }}>
           {children}
         </View>
