@@ -109,6 +109,7 @@ const getDC = (D:Palette) => [
 const num  = (v:any) => parseFloat(String(v??0).replace(/\s/g,'').replace(',','.')) || 0;
 const fmtM = (v:number) => v>=1e6?`$${(v/1e6).toFixed(1)}M`:v>=1e3?`$${(v/1e3).toFixed(0)}K`:`$${v.toFixed(0)}`;
 const fmtP = (v:number) => `${Math.round(v)}%`;
+const fmtN = (v:number) => v.toLocaleString('en-US');
 const sCol = (D:Palette,s:string) => ['On Track','Active','Resolved','Done'].includes(s)?D.green:s==='Delayed'?D.red:D.blue;
 const iCol = (D:Palette,v:number) => v>=1?D.green:D.red;
 
@@ -461,6 +462,53 @@ function ChartBox2({children}:{children:(w:number,h:number)=>React.ReactNode}) {
   );
 }
 
+// ── Site camera config ─────────────────────────────────────────────
+// Paste the public HLS URL from your on-site relay (MediaMTX + Cloudflare
+// Tunnel, etc.) here once it's running, e.g:
+//   'https://your-tunnel-name.trycloudflare.com/cam1/index.m3u8'
+// Leave empty to keep showing "No feed connected".
+const CAMERA_URL = '';
+// MediaMTX's built-in WebRTC viewer page (served at http://host:8889/<path>/).
+// NOTE: this is currently http://, not https:// — since the dashboard itself
+// is served over https, browsers will likely block this as "mixed content"
+// until it's served over https (ask him for a Cloudflare Tunnel / SSL cert
+// on this too). Leave empty to fall back to CAMERA_URL / the test clip.
+const CAMERA_WEBRTC_PAGE = 'http://82.200.237.211:8889/camera91/';
+
+// ── HlsVideo: plays a .m3u8 (HLS) stream in a plain <video> tag ──────
+// Safari can play HLS natively; every other browser needs hls.js to
+// unpack the stream into something <video> understands. Falls back to a
+// normal src assignment for plain file URLs (mp4, etc.) or webrtc/whep
+// links you might swap in later.
+function HlsVideo({url,style}:{url:string;style:any}) {
+  const videoRef = React.useRef<HTMLVideoElement|null>(null);
+  useEffect(() => {
+    if (Platform.OS!=='web') return;
+    const video = videoRef.current;
+    if (!video || !url) return;
+    let hls: any;
+    if (url.endsWith('.m3u8')) {
+      if (video.canPlayType('application/vnd.apple.mpegurl')) {
+        // Safari: native HLS support, no library needed
+        video.src = url;
+      } else {
+        // Chrome/Firefox/etc: needs hls.js — run `npm install hls.js` in the project
+        import('hls.js').then(({default: Hls}) => {
+          if (Hls.isSupported()) {
+            hls = new Hls();
+            hls.loadSource(url);
+            hls.attachMedia(video);
+          }
+        }).catch(()=>{/* hls.js not installed yet — feed just won't play */});
+      }
+    } else {
+      video.src = url;
+    }
+    return () => { if (hls) hls.destroy(); };
+  }, [url]);
+  return <video ref={videoRef} autoPlay muted loop playsInline style={style} />;
+}
+
 // ── TVScaleToFit: scales fixed-size content (like a slide) to always fit ──
 // available space, so it never needs scrolling on any TV/screen size —
 // it shrinks or grows the whole thing uniformly instead of reflowing pieces.
@@ -706,20 +754,26 @@ function ProjectDashboardTV({p,data,color}:{p:Project;data:SheetData;color:strin
           </Card>
         </View>
 
-        {/* Camera placeholder — reserved spot for a live site-camera feed.
-            For now, on web this plays a public sample video on loop just so
-            you can see how a live feed will look/fit; swap the <video> src
-            below for a real RTSP/HLS/WebRTC source once a camera is chosen. */}
+        {/* Camera — plays the real feed once CAMERA_URL is set above;
+            until then, falls back to a sample construction clip so the
+            card doesn't look broken/empty. */}
         <Card style={{flex:1.3,minWidth:220,padding:14,gap:10}}>
           <SH label="Site Camera" color={D.cyan}/>
           <View style={{flex:1,backgroundColor:D.bg,borderRadius:10,overflow:'hidden',
             borderWidth:1,borderColor:D.border,alignItems:'center',justifyContent:'center'}}>
             {Platform.OS==='web' ? (
-              <video
-                src="https://assets.mixkit.co/videos/4010/4010-360.mp4"
-                autoPlay muted loop playsInline
-                style={{width:'100%',height:'100%',objectFit:'cover',borderRadius:10}}
-              />
+              CAMERA_WEBRTC_PAGE ? (
+                <iframe
+                  src={CAMERA_WEBRTC_PAGE}
+                  style={{width:'100%',height:'100%',border:'none',borderRadius:10}}
+                  allow="autoplay; camera; microphone"
+                />
+              ) : (
+                <HlsVideo
+                  url={CAMERA_URL || "https://assets.mixkit.co/videos/4010/4010-360.mp4"}
+                  style={{width:'100%',height:'100%',objectFit:'cover',borderRadius:10}}
+                />
+              )
             ) : (
               <View style={{alignItems:'center',justifyContent:'center',gap:8}}>
                 <Ionicons name="videocam-outline" size={32} color={D.muted}/>
@@ -979,27 +1033,27 @@ function ProjectDashboard({p,data,color}:{p:Project;data:SheetData;color:string}
             {phases.map(phase=>{
               const phMs=schedule.filter(m=>m.phase===phase);
               const phDone=phMs.filter(m=>m.status==='Done').length;
-              const phPct=phMs.length>0?(phDone/phMs.length)*100:0;
-              // "Planned %" = share of this phase's milestones whose planned_end date has
-              // already passed — i.e. how far along the phase should be by today per plan.
-              const phPlannedDone=phMs.filter(m=>{
-                const pd=parseDate(m.planned_end);
-                return pd&&pd<=today;
-              }).length;
-              const phPlannedPct=phMs.length>0?(phPlannedDone/phMs.length)*100:0;
-              const phCol=phPct===100?D.green:phMs.some(m=>m.status==='Delayed')?D.red:D.blue;
+              const statusPct=phMs.length>0?(phDone/phMs.length)*100:0;
+              // Quantity-based actual %: sum actual_completed / sum total_qty
+              // across this phase's milestones, when those columns are filled
+              // in. Falls back to the old status-based % when qty data is
+              // missing (e.g. sheet not updated yet for this phase).
+              const phTotalQty=phMs.reduce((s,m)=>s+num(m.total_qty),0);
+              const phActualQty=phMs.reduce((s,m)=>s+num(m.actual_completed),0);
+              const hasQty=phTotalQty>0;
+              const phPct=hasQty?(phActualQty/phTotalQty)*100:statusPct;
+              const phCol=phPct>=100?D.green:phMs.some(m=>m.status==='Delayed')?D.red:D.blue;
               return(
                 <View key={phase} style={{gap:3}}>
                   <View style={{flexDirection:'row',justifyContent:'space-between'}}>
-                    <Text style={{fontSize:11,color:D.text}}>{phase}</Text>
-                    <View style={{flexDirection:'row',alignItems:'center',gap:8}}>
-                      <Text style={{fontSize:11,color:D.muted}}>{fmtP(phPlannedPct)} plan</Text>
-                      <Text style={{fontSize:11,color:phCol,fontWeight:'700'}}>{fmtP(phPct)}</Text>
+                    <View style={{flexDirection:'row',alignItems:'baseline',gap:8}}>
+                      <Text style={{fontSize:11,color:D.text}}>{phase}</Text>
+                      {hasQty&&<Text style={{fontSize:10,color:D.muted}}>Qty {fmtN(phTotalQty)}</Text>}
                     </View>
+                    <Text style={{fontSize:11,color:phCol,fontWeight:'700'}}>{fmtP(phPct)}</Text>
                   </View>
                   <View style={{height:14,backgroundColor:D.bg,borderRadius:7,overflow:'hidden'}}>
-                    {phPct>0&&<View style={{position:'absolute',top:0,left:0,height:14,width:`${phPlannedPct}%` as any,backgroundColor:phCol,opacity:0.25,borderRadius:7}}/>}
-                    {phPct>0&&<View style={{position:'absolute',top:0,left:0,height:14,width:`${phPct}%` as any,backgroundColor:phCol,opacity:0.85,borderRadius:7}}/>}
+                    {phPct>0&&<View style={{position:'absolute',top:0,left:0,height:14,width:`${Math.min(phPct,100)}%` as any,backgroundColor:phCol,opacity:0.85,borderRadius:7}}/>}
                   </View>
                 </View>
               );
