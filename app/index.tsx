@@ -473,7 +473,7 @@ const CAMERA_URL = '';
 // is served over https, browsers will likely block this as "mixed content"
 // until it's served over https (ask him for a Cloudflare Tunnel / SSL cert
 // on this too). Leave empty to fall back to CAMERA_URL / the test clip.
-const CAMERA_WEBRTC_PAGE = 'http://82.200.237.211:8889/camera91/';
+const CAMERA_WEBRTC_PAGE = 'https://bar-rendered-automobile-cash.trycloudflare.com/camera91/';
 
 // ── HlsVideo: plays a .m3u8 (HLS) stream in a plain <video> tag ──────
 // Safari can play HLS natively; every other browser needs hls.js to
