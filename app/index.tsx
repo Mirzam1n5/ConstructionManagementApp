@@ -745,28 +745,19 @@ function ProjectDashboardTV({p,data,color}:{p:Project;data:SheetData;color:strin
           <SH label="Site Camera" color={D.cyan}/>
           <View style={{flex:1,backgroundColor:D.bg,borderRadius:10,overflow:'hidden',
             borderWidth:1,borderColor:D.border,alignItems:'center',justifyContent:'center'}}>
-            {Platform.OS==='web' ? (
-              p.camera_url ? (
-                p.camera_url.endsWith('.m3u8') ? (
-                  <HlsVideo
-                    url={p.camera_url}
-                    style={{width:'100%',height:'100%',objectFit:'cover',borderRadius:10}}
-                  />
-                ) : (
-                  // Anything that isn't a plain .m3u8 file is treated as an
-                  // embeddable page (e.g. MediaMTX's built-in WebRTC viewer).
-                  <iframe
-                    src={p.camera_url}
-                    style={{width:'100%',height:'100%',border:'none',borderRadius:10}}
-                    allow="autoplay; camera; microphone"
-                  />
-                )
-              ) : (
-                // No camera_url filled in for this project yet — show the
-                // sample clip so the card doesn't look broken/empty.
+            {Platform.OS==='web' && p.camera_url ? (
+              p.camera_url.endsWith('.m3u8') ? (
                 <HlsVideo
-                  url={CAMERA_URL || "https://assets.mixkit.co/videos/4010/4010-360.mp4"}
+                  url={p.camera_url}
                   style={{width:'100%',height:'100%',objectFit:'cover',borderRadius:10}}
+                />
+              ) : (
+                // Anything that isn't a plain .m3u8 file is treated as an
+                // embeddable page (e.g. MediaMTX's built-in WebRTC viewer).
+                <iframe
+                  src={p.camera_url}
+                  style={{width:'100%',height:'100%',border:'none',borderRadius:10}}
+                  allow="autoplay; camera; microphone"
                 />
               )
             ) : (
