@@ -480,25 +480,15 @@ function HlsVideo({url,style}:{url:string;style:any}) {
     if (Platform.OS!=='web') return;
     const video = videoRef.current;
     if (!video || !url) return;
-    let hls: any;
-    if (url.endsWith('.m3u8')) {
-      if (video.canPlayType('application/vnd.apple.mpegurl')) {
-        // Safari: native HLS support, no library needed
-        video.src = url;
-      } else {
-        // Chrome/Firefox/etc: needs hls.js — run `npm install hls.js` in the project
-        import('hls.js').then(({default: Hls}) => {
-          if (Hls.isSupported()) {
-            hls = new Hls();
-            hls.loadSource(url);
-            hls.attachMedia(video);
-          }
-        }).catch(()=>{/* hls.js not installed yet — feed just won't play */});
-      }
-    } else {
-      video.src = url;
-    }
-    return () => { if (hls) hls.destroy(); };
+    // Plain src assignment: works for normal video files (mp4, etc.) and for
+    // .m3u8 (HLS) in Safari, which supports HLS natively. Chrome/Firefox
+    // can't play .m3u8 this way — that needs the hls.js library, which is
+    // intentionally NOT wired up here yet (it isn't installed in this
+    // project, and importing it un-installed breaks the Render build). To
+    // add real cross-browser HLS support later: run `npm install hls.js`,
+    // then reintroduce a dynamic `import('hls.js')` here for the non-Safari,
+    // .m3u8 case.
+    video.src = url;
   }, [url]);
   return <video ref={videoRef} autoPlay muted loop playsInline style={style} />;
 }
