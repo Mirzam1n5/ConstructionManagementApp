@@ -17,6 +17,11 @@ export interface Project {
   cpi: number;
   spi: number;
   notes: string;
+  // Optional site-camera feed URL (new column, may not exist in all sheets
+  // yet). Points to a WebRTC viewer page or HLS .m3u8 — whatever the on-site
+  // relay is serving. Left undefined when the sheet doesn't have it yet, so
+  // the dashboard can fall back to a placeholder.
+  camera_url?: string;
   // Optional deviation fields (new, may not exist in all sheets)
   cost_variance_usd?: number;
   schedule_variance_days?: number;
@@ -75,6 +80,11 @@ export interface Milestone {
   progress_pct: number;
   status: string;
   responsible: string;
+  // Optional quantity-based tracking (new columns, may not exist in all sheets
+  // yet). When present, the dashboard shows actual completion by quantity
+  // (actual_completed / total_qty) instead of the plain status-based %.
+  total_qty?: number;
+  actual_completed?: number;
 }
 
 export interface EvmRow {

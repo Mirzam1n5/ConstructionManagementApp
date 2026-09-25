@@ -466,14 +466,8 @@ function ChartBox2({children}:{children:(w:number,h:number)=>React.ReactNode}) {
 // Paste the public HLS URL from your on-site relay (MediaMTX + Cloudflare
 // Tunnel, etc.) here once it's running, e.g:
 //   'https://your-tunnel-name.trycloudflare.com/cam1/index.m3u8'
-// Leave empty to keep showing "No feed connected".
+// Used as a fallback if a project has no camera_url filled in yet.
 const CAMERA_URL = '';
-// MediaMTX's built-in WebRTC viewer page (served at http://host:8889/<path>/).
-// NOTE: this is currently http://, not https:// — since the dashboard itself
-// is served over https, browsers will likely block this as "mixed content"
-// until it's served over https (ask him for a Cloudflare Tunnel / SSL cert
-// on this too). Leave empty to fall back to CAMERA_URL / the test clip.
-const CAMERA_WEBRTC_PAGE = 'https://camera.isker.kz:8889/camera91/';
 
 // ── HlsVideo: plays a .m3u8 (HLS) stream in a plain <video> tag ──────
 // Safari can play HLS natively; every other browser needs hls.js to
@@ -762,13 +756,24 @@ function ProjectDashboardTV({p,data,color}:{p:Project;data:SheetData;color:strin
           <View style={{flex:1,backgroundColor:D.bg,borderRadius:10,overflow:'hidden',
             borderWidth:1,borderColor:D.border,alignItems:'center',justifyContent:'center'}}>
             {Platform.OS==='web' ? (
-              CAMERA_WEBRTC_PAGE ? (
-                <iframe
-                  src={CAMERA_WEBRTC_PAGE}
-                  style={{width:'100%',height:'100%',border:'none',borderRadius:10}}
-                  allow="autoplay; camera; microphone"
-                />
+              p.camera_url ? (
+                p.camera_url.endsWith('.m3u8') ? (
+                  <HlsVideo
+                    url={p.camera_url}
+                    style={{width:'100%',height:'100%',objectFit:'cover',borderRadius:10}}
+                  />
+                ) : (
+                  // Anything that isn't a plain .m3u8 file is treated as an
+                  // embeddable page (e.g. MediaMTX's built-in WebRTC viewer).
+                  <iframe
+                    src={p.camera_url}
+                    style={{width:'100%',height:'100%',border:'none',borderRadius:10}}
+                    allow="autoplay; camera; microphone"
+                  />
+                )
               ) : (
+                // No camera_url filled in for this project yet — show the
+                // sample clip so the card doesn't look broken/empty.
                 <HlsVideo
                   url={CAMERA_URL || "https://assets.mixkit.co/videos/4010/4010-360.mp4"}
                   style={{width:'100%',height:'100%',objectFit:'cover',borderRadius:10}}
