@@ -1054,6 +1054,12 @@ function ProjectDashboard({p,data,color}:{p:Project;data:SheetData;color:string}
               // missing (e.g. sheet not updated yet for this phase).
               const phTotalQty=phMs.reduce((s,m)=>s+num(m.total_qty),0);
               const phActualQty=phMs.reduce((s,m)=>s+num(m.actual_completed),0);
+              // showQty: the total_qty/actual_completed columns exist in the
+              // Schedule tab (even if still empty) -> always show the numbers,
+              // as 0 until they're filled in.
+              // hasQty: there's a real total to divide by -> use the
+              // quantity-based % instead of the status-based one.
+              const showQty=phMs.some(m=>m.total_qty!==undefined||m.actual_completed!==undefined);
               const hasQty=phTotalQty>0;
               const phPct=hasQty?(phActualQty/phTotalQty)*100:statusPct;
               const phCol=phPct>=100?D.green:phMs.some(m=>m.status==='Delayed')?D.red:D.blue;
@@ -1062,9 +1068,12 @@ function ProjectDashboard({p,data,color}:{p:Project;data:SheetData;color:string}
                   <View style={{flexDirection:'row',justifyContent:'space-between'}}>
                     <View style={{flexDirection:'row',alignItems:'baseline',gap:8}}>
                       <Text style={{fontSize:11,color:D.text}}>{phase}</Text>
-                      {hasQty&&<Text style={{fontSize:10,color:D.muted}}>Qty {fmtN(phTotalQty)}</Text>}
+                      {showQty&&<Text style={{fontSize:10,color:D.muted}}>Qty {fmtN(Math.round(phTotalQty))}</Text>}
                     </View>
-                    <Text style={{fontSize:11,color:phCol,fontWeight:'700'}}>{fmtP(phPct)}</Text>
+                    <View style={{flexDirection:'row',alignItems:'baseline',gap:10}}>
+                      {showQty&&<Text style={{fontSize:11,color:D.text}}>{fmtN(Math.round(phActualQty))}</Text>}
+                      <Text style={{fontSize:11,color:phCol,fontWeight:'700'}}>{hasQty?fmtP2(phPct):fmtP(phPct)}</Text>
+                    </View>
                   </View>
                   <View style={{height:14,backgroundColor:D.bg,borderRadius:7,overflow:'hidden'}}>
                     {phPct>0&&<View style={{position:'absolute',top:0,left:0,height:14,width:`${Math.min(phPct,100)}%` as any,backgroundColor:phCol,opacity:0.85,borderRadius:7}}/>}
@@ -1086,7 +1095,7 @@ function ProjectDashboard({p,data,color}:{p:Project;data:SheetData;color:string}
         {/* Budget by Category — donut + legend listing only the categories
             that actually have spend (actual_usd > 0), with their share */}
         <Card style={{flex:2,padding:16,gap:14}}>
-          <SH label="Budget by Category" color={D.orange}/>
+          <SH label="Spent by Category" color={D.orange}/>
           {(()=>{
             // keep each category's colour tied to its position in catData so
             // colours don't shuffle when other categories get spend later
@@ -1100,7 +1109,7 @@ function ProjectDashboard({p,data,color}:{p:Project;data:SheetData;color:string}
                   slices={active.map(c=>({v:c.ac,c:c.color}))}
                   size={200}
                   label={fmtM(totalAc)}
-                  sublabel="actual"
+                  sublabel="spent"
                 />
                 {active.length===0?(
                   <Text style={{fontSize:11,color:D.muted}}>No actual spend recorded yet</Text>
