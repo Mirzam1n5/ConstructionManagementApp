@@ -112,6 +112,32 @@ const fmtP = (v:number) => `${Math.round(v)}%`;
 // Plan/Fact/Deviation can be tiny (e.g. 0.29%), so keep 2 decimals below 10%
 const fmtP2 = (v:number) => Math.abs(v)<10 ? `${v.toFixed(2)}%` : `${Math.round(v)}%`;
 const fmtN = (v:number) => v.toLocaleString('en-US');
+// ── EVM x-axis labels ────────────────────────────────────────────────
+// The EVM "month" column can arrive in different shapes depending on how the
+// sheet cell is formatted: plain text ("2026-09"), or a real date cell, which
+// Google returns as "Date(2026,8,30)" (month is 0-indexed). The old code just
+// sliced characters 5-7, which turned "Date(2026,8,30)" into "20" for every
+// point. This parses all the common shapes into [month, day].
+const parseEvmDate = (raw:any):{m:number;d:number|null}|null => {
+  if(raw==null||raw==='') return null;
+  const t=String(raw).trim();
+  let mt=t.match(/^Date\((\d{4}),\s*(\d{1,2})(?:,\s*(\d{1,2}))?/);
+  if(mt) return {m:parseInt(mt[2],10)+1,d:mt[3]?parseInt(mt[3],10):null};
+  mt=t.match(/^(\d{4})-(\d{1,2})(?:-(\d{1,2}))?/);
+  if(mt) return {m:parseInt(mt[2],10),d:mt[3]?parseInt(mt[3],10):null};
+  mt=t.match(/^(\d{1,2})[./](\d{1,2})[./](\d{4})/);
+  if(mt) return {m:parseInt(mt[2],10),d:parseInt(mt[1],10)};
+  return null;
+};
+const evmLabels = (rows:{month:string}[]):string[] => {
+  const parsed=rows.map(r=>parseEvmDate(r.month));
+  const pad=(n:number)=>String(n).padStart(2,'0');
+  const byMonth=parsed.map((x,i)=>x?pad(x.m):String(rows[i].month??'').slice(0,7));
+  // If several points fall in the same month (e.g. weekly rows), include the
+  // day so the labels stay distinguishable: "30.09" instead of "09","09","09".
+  const dupes=new Set(byMonth).size<byMonth.length;
+  return parsed.map((x,i)=>x?(dupes&&x.d!=null?`${pad(x.d)}.${pad(x.m)}`:pad(x.m)):byMonth[i]);
+};
 const sCol = (D:Palette,s:string) => ['On Track','Active','Resolved','Done'].includes(s)?D.green:s==='Delayed'?D.red:D.blue;
 const iCol = (D:Palette,v:number) => v>=1?D.green:D.red;
 
@@ -594,7 +620,7 @@ function ProjectDashboardTV({p,data,color}:{p:Project;data:SheetData;color:strin
   workers.forEach(w=>{byDept[w.department]=(byDept[w.department]??0)+1;});
   const depts=Object.entries(byDept).sort((a,b)=>b[1]-a[1]);
 
-  const evmMonths=evm.map(e=>e.month?.slice(5,7)??'');
+  const evmMonths=evmLabels(evm);
   const pvS=evm.map(e=>num(e.pv_usd));
   const evS=evm.map(e=>num(e.ev_usd));
   const acS=evm.map(e=>num(e.ac_usd));
@@ -845,7 +871,7 @@ function ProjectDashboard({p,data,color}:{p:Project;data:SheetData;color:string}
   workers.forEach(w=>{byDept[w.department]=(byDept[w.department]??0)+1;});
   const depts=Object.entries(byDept).sort((a,b)=>b[1]-a[1]);
 
-  const evmMonths=evm.map(e=>e.month?.slice(5,7)??'');
+  const evmMonths=evmLabels(evm);
   const pvS=evm.map(e=>num(e.pv_usd));
   const evS=evm.map(e=>num(e.ev_usd));
   const acS=evm.map(e=>num(e.ac_usd));
@@ -984,9 +1010,9 @@ function ProjectDashboard({p,data,color}:{p:Project;data:SheetData;color:string}
       <View style={{flexDirection:isNarrow?'column':'row',gap:14}}>
 
         {/* Gauge */}
-        <Card style={{flex:1.2,minWidth:160,maxWidth:220,padding:16,alignItems:'center',gap:10,justifyContent:'center'}}>
+        <Card style={{flex:1.2,minWidth:160,maxWidth:260,padding:16,alignItems:'center',gap:10,justifyContent:'center'}}>
           <ArcGauge pct={prog} color={color} size={158} label={fmtP(prog)} sublabel="complete"/>
-          {p.notes&&<Text style={{fontSize:10,color:D.muted,textAlign:'center',lineHeight:15}} numberOfLines={3}>{p.notes}</Text>}
+          {p.notes&&<Text style={{fontSize:10,color:D.muted,textAlign:'center',lineHeight:15}}>{p.notes}</Text>}
         </Card>
 
         {/* CPI / SPI */}
