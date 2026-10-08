@@ -17,10 +17,7 @@ export interface Project {
   cpi: number;
   spi: number;
   notes: string;
-  // Optional site-camera feed URL (new column, may not exist in all sheets
-  // yet). Points to a WebRTC viewer page or HLS .m3u8 — whatever the on-site
-  // relay is serving. Left undefined when the sheet doesn't have it yet, so
-  // the dashboard can fall back to a placeholder.
+  // Optional site-camera feed URL (WebRTC viewer page or .m3u8)
   camera_url?: string;
   // Optional deviation fields (new, may not exist in all sheets)
   cost_variance_usd?: number;
@@ -80,9 +77,7 @@ export interface Milestone {
   progress_pct: number;
   status: string;
   responsible: string;
-  // Optional quantity-based tracking (new columns, may not exist in all sheets
-  // yet). When present, the dashboard shows actual completion by quantity
-  // (actual_completed / total_qty) instead of the plain status-based %.
+  // Optional quantity-based tracking (new columns, may not exist yet)
   total_qty?: number;
   actual_completed?: number;
 }
@@ -161,7 +156,18 @@ async function fetchSheet<T>(sheetName: string, sheetId: string): Promise<T[]> {
       const obj: Record<string, any> = {};
       cols.forEach((col, i) => {
         const cell = row.c[i];
-        obj[col] = cell ? (cell.v ?? '') : '';
+        let val: any = cell ? (cell.v ?? '') : '';
+        // Percent-formatted cells (e.g. "0,29%") arrive from Google as the raw
+        // fraction (0.0029). The dashboard works in percent points (0.29), so
+        // if the cell's displayed text is a percentage and matches v*100 more
+        // closely than v itself, convert it. Plain numbers are left untouched.
+        if (cell && typeof cell.v === 'number' && typeof cell.f === 'string' && cell.f.includes('%')) {
+          const shown = parseFloat(cell.f.replace('%', '').replace(/\s/g, '').replace(',', '.'));
+          if (!isNaN(shown) && Math.abs(cell.v * 100 - shown) < Math.abs(cell.v - shown)) {
+            val = cell.v * 100;
+          }
+        }
+        obj[col] = val;
       });
       return obj as T;
     });
@@ -207,7 +213,8 @@ export function useSheetData(sheetId?: string) {
         // difference between "0%" and "not provided" and fall back accordingly.
         plan_pct: p.plan_pct,
         fact_pct: p.fact_pct,
-        deviation_pct: p.deviation_pct,
+        // Sheet header is sometimes just "deviation" instead of "deviation_pct"
+        deviation_pct: p.deviation_pct ?? (p as any).deviation,
       }));
 
       setData({ 

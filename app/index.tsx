@@ -109,6 +109,8 @@ const getDC = (D:Palette) => [
 const num  = (v:any) => parseFloat(String(v??0).replace(/\s/g,'').replace(',','.')) || 0;
 const fmtM = (v:number) => v>=1e6?`$${(v/1e6).toFixed(1)}M`:v>=1e3?`$${(v/1e3).toFixed(0)}K`:`$${v.toFixed(0)}`;
 const fmtP = (v:number) => `${Math.round(v)}%`;
+// Plan/Fact/Deviation can be tiny (e.g. 0.29%), so keep 2 decimals below 10%
+const fmtP2 = (v:number) => Math.abs(v)<10 ? `${v.toFixed(2)}%` : `${Math.round(v)}%`;
 const fmtN = (v:number) => v.toLocaleString('en-US');
 const sCol = (D:Palette,s:string) => ['On Track','Active','Resolved','Done'].includes(s)?D.green:s==='Delayed'?D.red:D.blue;
 const iCol = (D:Palette,v:number) => v>=1?D.green:D.red;
@@ -672,8 +674,8 @@ function ProjectDashboardTV({p,data,color}:{p:Project;data:SheetData;color:strin
                 {forecastEnd&&<Stat size="lg" label="Forecast End" value={forecastEnd}
                   sub={`${(deviationDays??0)>0?'+':''}${deviationDays??0}d vs plan`}
                   subColor={devColor}/>}
-                {planPct!=null&&<Stat size="lg" label="Plan → Fact" value={`${fmtP(planPct)} → ${fmtP(factPct)}`}
-                  sub={devPct!=null?`${devPct>0?'+':''}${devPct.toFixed(1)}%`:undefined}
+                {planPct!=null&&<Stat size="lg" label="Plan → Fact" value={`${fmtP2(planPct)} → ${fmtP2(factPct)}`}
+                  sub={devPct!=null?`${devPct>0?'+':''}${devPct.toFixed(2)}%`:undefined}
                   subColor={devPct!=null?(devPct<0?D.red:D.green):undefined}/>}
               </View>
             </View>
@@ -936,9 +938,9 @@ function ProjectDashboard({p,data,color}:{p:Project;data:SheetData;color:string}
               <Stat label="Forecast End" value={forecastEnd??"-"}/>
             </View>
             <View style={{flexDirection:'row',flexWrap:'wrap',gap:8,marginTop:8}}>
-              <Stat label="Plan %" value={planPct!=null?fmtP(planPct):"-"}/>
-              <Stat label="Deviation %" value={`${(devPct??0)>0?'+':''}${(devPct??0).toFixed(1)}%`} color={(devPct??0)<0?D.red:D.green}/>
-              <Stat label="Fact %" value={fmtP(factPct)}/>
+              <Stat label="Plan %" value={planPct!=null?fmtP2(planPct):"-"}/>
+              <Stat label="Deviation %" value={`${(devPct??0)>0?'+':''}${(devPct??0).toFixed(2)}%`} color={(devPct??0)<0?D.red:D.green}/>
+              <Stat label="Fact %" value={fmtP2(factPct)}/>
             </View>
             <Text style={{fontSize:44,fontWeight:'900',color,lineHeight:46}}>{fmtP(prog)}</Text>
           </View>
