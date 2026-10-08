@@ -1057,17 +1057,41 @@ function ProjectDashboard({p,data,color}:{p:Project;data:SheetData;color:string}
           </View>
         </Card>
 
-        {/* Budget by Category */}
+        {/* Budget by Category — donut + legend listing only the categories
+            that actually have spend (actual_usd > 0), with their share */}
         <Card style={{flex:2,padding:16,gap:14}}>
           <SH label="Budget by Category" color={D.orange}/>
-          <View style={{alignItems:'center',flex:1,justifyContent:'center'}}>
-            <Donut
-              slices={catData.map((c,i)=>({v:c.ac,c:DC[i%7]}))}
-              size={220}
-              label={fmtM(catData.reduce((s,c)=>s+c.ac,0))}
-              sublabel="actual"
-            />
-          </View>
+          {(()=>{
+            // keep each category's colour tied to its position in catData so
+            // colours don't shuffle when other categories get spend later
+            const active=catData
+              .map((c,i)=>({...c,color:DC[i%7]}))
+              .filter(c=>c.ac>0);
+            const totalAc=active.reduce((s,c)=>s+c.ac,0);
+            return(
+              <View style={{alignItems:'center',flex:1,justifyContent:'center',gap:14}}>
+                <Donut
+                  slices={active.map(c=>({v:c.ac,c:c.color}))}
+                  size={200}
+                  label={fmtM(totalAc)}
+                  sublabel="actual"
+                />
+                {active.length===0?(
+                  <Text style={{fontSize:11,color:D.muted}}>No actual spend recorded yet</Text>
+                ):(
+                  <View style={{width:'100%',gap:6}}>
+                    {active.map(c=>(
+                      <View key={c.cat} style={{flexDirection:'row',alignItems:'center',gap:8}}>
+                        <View style={{width:10,height:10,borderRadius:5,backgroundColor:c.color}}/>
+                        <Text numberOfLines={1} style={{flex:1,fontSize:11,color:D.text}}>{c.cat}</Text>
+                        <Text style={{fontSize:11,color:D.sub,fontWeight:'700'}}>{fmtP2(totalAc>0?(c.ac/totalAc)*100:0)}</Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </View>
+            );
+          })()}
         </Card>
       </View>
 
