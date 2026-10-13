@@ -6,9 +6,17 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // ─── PostgreSQL ──────────────────────────────────────────────────
+if (!process.env.DATABASE_URL) {
+  console.error('DATABASE_URL is not set. Example: postgresql://user:password@localhost:5432/isker');
+  process.exit(1);
+}
+
+// Render's managed Postgres requires SSL; a Postgres on a company server
+// usually does not. Set DATABASE_SSL=false to turn SSL off.
+const useSsl = process.env.DATABASE_SSL !== 'false';
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false },
+  ssl: useSsl ? { rejectUnauthorized: false } : false,
 });
 
 async function initDb() {
@@ -23,9 +31,16 @@ async function initDb() {
 }
 
 // ─── Auth ────────────────────────────────────────────────────────
-// Set APP_PASSWORD in Render environment variables.
+// Set APP_PASSWORD (and APP_SECRET) in the environment variables.
 // Token is a simple HMAC so we don't need to store sessions.
 const SECRET = process.env.APP_SECRET || 'isker-secret-change-me';
+
+if (!process.env.APP_PASSWORD) {
+  console.warn('WARNING: APP_PASSWORD is not set - login is disabled, anyone who can reach the server has access.');
+}
+if (!process.env.APP_SECRET) {
+  console.warn('WARNING: APP_SECRET is not set - using the built-in default token secret. Set your own value.');
+}
 
 function makeToken() {
   return crypto.createHmac('sha256', SECRET).update('isker-auth').digest('hex');

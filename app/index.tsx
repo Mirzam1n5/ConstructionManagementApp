@@ -9,7 +9,9 @@ import { ThemeContext, useTheme, usePersistedTheme, DARK, LIGHT, type Palette } 
 import { getJSON, setJSON } from '../hooks/useStorage';
 
 // ── API base URL ────────────────────────────────────────────────────
-const API_BASE = 'https://isker-app.onrender.com';
+// Only used by the native (non-web) build; the web build calls /api on its own origin.
+// Override at build time with EXPO_PUBLIC_API_BASE.
+const API_BASE = process.env.EXPO_PUBLIC_API_BASE ?? 'https://isker-app.onrender.com';
 const apiUrl = (path: string) => Platform.OS === 'web' ? path : `${API_BASE}${path}`;
 
 // ── Auth token storage ───────────────────────────────────────────────
@@ -1796,7 +1798,7 @@ function MobileHome({sheets,setSheets,token}:{sheets:SheetEntry[];setSheets:(s:S
         ),
         headerTitleAlign:'center',
         headerStyle:{backgroundColor:D.panel},
-        headerTitleStyle:{color:D.text,fontWeight:'800',fontSize:16,letterSpacing:3},
+        headerTitleStyle:{color:D.text,fontWeight:'800',fontSize:16,letterSpacing:3} as any,
         headerShadowVisible:false,
         headerRight:()=>(
           <View style={{flexDirection:'row',alignItems:'center',gap:4}}>
