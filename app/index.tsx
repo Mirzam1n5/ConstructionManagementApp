@@ -498,6 +498,9 @@ function ChartBox2({children}:{children:(w:number,h:number)=>React.ReactNode}) {
 //   'https://your-tunnel-name.trycloudflare.com/cam1/index.m3u8'
 // Used as a fallback if a project has no camera_url filled in yet.
 const CAMERA_URL = '';
+// Temporarily hides the "Site Camera" card in TV mode (it takes no space while
+// off). Set to true to bring it back — nothing else needs to change.
+const SHOW_CAMERA = false;
 
 // ── HlsVideo: plays a .m3u8 (HLS) stream in a plain <video> tag ──────
 // Safari can play HLS natively; every other browser needs hls.js to
@@ -738,10 +741,10 @@ function ProjectDashboardTV({p,data,color}:{p:Project;data:SheetData;color:strin
       </Card>
 
       {/* ══ ROW 1: Gauge | CPI/SPI tiles | Camera placeholder (Milestones hidden on TV for now) ══ */}
-      <View style={{flex:5.6,flexDirection:'row',flexWrap:'wrap',alignContent:'stretch',gap:14}}>
+      <View style={{flex:SHOW_CAMERA?5.6:5,flexDirection:'row',flexWrap:'wrap',alignContent:'stretch',gap:14}}>
 
         {/* Gauge */}
-        <Card style={{flex:1.2,minWidth:200,padding:14,alignItems:'center',justifyContent:'center'}}>
+        <Card style={{flex:SHOW_CAMERA?1.2:1.4,minWidth:200,padding:14,alignItems:'center',justifyContent:'center'}}>
           <ChartBox2>{(cw,ch)=>{
             const size=Math.min(cw,ch/0.72,260)*0.98;
             return(
@@ -753,7 +756,7 @@ function ProjectDashboardTV({p,data,color}:{p:Project;data:SheetData;color:strin
         </Card>
 
         {/* CPI / SPI large tiles */}
-        <View style={{flex:0.9,minWidth:170,gap:12}}>
+        <View style={{flex:SHOW_CAMERA?0.9:1,minWidth:170,gap:12}}>
           <Card style={{flex:1,alignItems:'center',justifyContent:'center',gap:3,
             backgroundColor:cpi>=1?D.greenDim:D.redDim,borderColor:cpi>=1?D.green:D.red}}>
             <Text style={{fontSize:11,color:D.sub,letterSpacing:1.5}}>CPI</Text>
@@ -768,6 +771,8 @@ function ProjectDashboardTV({p,data,color}:{p:Project;data:SheetData;color:strin
           </Card>
         </View>
 
+        {SHOW_CAMERA&&(
+          <>
         {/* Camera — plays the real feed once CAMERA_URL is set above;
             until then, falls back to a sample construction clip so the
             card doesn't look broken/empty. */}
@@ -798,11 +803,13 @@ function ProjectDashboardTV({p,data,color}:{p:Project;data:SheetData;color:strin
             )}
           </View>
         </Card>
+          </>
+        )}
       </View>
 
       {/* ══ ROW 2: EVM S-Curve | CPI/SPI Trend (Budget by Category hidden on TV for now) ══ */}
       {evm.length>=2&&(
-        <View style={{flex:5.4,flexDirection:'row',flexWrap:'wrap',alignContent:'stretch',gap:14}}>
+        <View style={{flex:SHOW_CAMERA?5.4:6,flexDirection:'row',flexWrap:'wrap',alignContent:'stretch',gap:14}}>
           <Card style={{flex:3,minWidth:320,padding:22,gap:12}}>
             <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:8}}>
               <SH label="EVM S-Curve" color={color}/>
