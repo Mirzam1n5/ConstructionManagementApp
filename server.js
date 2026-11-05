@@ -1,4 +1,5 @@
 const express = require('express');
+const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { Pool } = require('pg');
@@ -79,6 +80,26 @@ app.post('/api/auth', (req, res) => {
   }
 });
 
+// ─── Build version (public) ──────────────────────────────────────
+// Changes whenever a new web build is deployed (the build output index.html
+// references hashed bundle names). The web app polls this and reloads itself
+// when it differs from the version it started with, so TVs/browsers left open
+// pick up new deployments without anyone touching them.
+function computeBuildId() {
+  try {
+    const html = fs.readFileSync(path.join(__dirname, 'dist', 'index.html'));
+    return crypto.createHash('sha1').update(html).digest('hex').slice(0, 12);
+  } catch (e) {
+    return String(Date.now()); // no build found: new value on every start
+  }
+}
+const BUILD_ID = computeBuildId();
+
+app.get('/api/version', (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.json({ version: BUILD_ID });
+});
+
 // ─── API endpoints (protected) ────────────────────────────────────
 // GET /api/sheets
 app.get('/api/sheets', requireAuth, async (req, res) => {
@@ -124,6 +145,9 @@ app.delete('/api/sheets/:id', requireAuth, async (req, res) => {
 // ─── Static / SPA ────────────────────────────────────────────────
 app.use(express.static(path.join(__dirname, 'dist'), {
   setHeaders: (res, filePath) => {
+    // index.html must always be re-checked so a new deployment is picked up;
+    // the hashed .js/.css bundles can be cached safely.
+    if (filePath.endsWith('.html')) res.setHeader('Cache-Control', 'no-cache');
     if (filePath.endsWith('.js'))   res.setHeader('Content-Type', 'application/javascript');
     else if (filePath.endsWith('.css'))  res.setHeader('Content-Type', 'text/css');
     else if (filePath.endsWith('.json')) res.setHeader('Content-Type', 'application/json');
@@ -131,6 +155,7 @@ app.use(express.static(path.join(__dirname, 'dist'), {
 }));
 
 app.get('*', (req, res) => {
+  res.set('Cache-Control', 'no-cache');
   res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 

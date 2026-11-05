@@ -44,6 +44,43 @@ async function clearToken() {
 function authHeaders(token: string) {
   return { 'Content-Type': 'application/json', 'x-isker-token': token };
 }
+
+// ── Auto-reload after a new deployment (web only) ───────────────────
+// The server exposes /api/version, which changes whenever a new build is
+// deployed. A TV or browser tab left open keeps running the old code until
+// someone reloads it, so we check the version once a minute (and whenever the
+// tab becomes visible again) and reload the page by ourselves if it changed.
+// Network errors are ignored (the server is usually briefly down while it
+// restarts) - we simply try again on the next check.
+function useAutoReloadOnDeploy(intervalMs = 60000) {
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined') return;
+    let startVersion: string | null = null;
+    let reloading = false;
+    const check = async () => {
+      if (reloading) return;
+      try {
+        const res = await fetch(apiUrl('/api/version'), { cache: 'no-store' });
+        if (!res.ok) return;
+        const { version } = await res.json();
+        if (!version) return;
+        if (startVersion === null) startVersion = version;
+        else if (version !== startVersion) {
+          reloading = true;
+          window.location.reload();
+        }
+      } catch (e) { /* server restarting or offline - retry next tick */ }
+    };
+    check();
+    const timer = setInterval(check, intervalMs);
+    const onVisible = () => { if (document.visibilityState === 'visible') check(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [intervalMs]);
+}
 // ── Logo component ──────────────────────────────────────────────────
 // Displays logo.png (horizontal 810×220) with adaptive sizing for mobile and web
 // Maintains 3.68:1 aspect ratio
@@ -1877,6 +1914,7 @@ function MobileHome({sheets,setSheets,token}:{sheets:SheetEntry[];setSheets:(s:S
 // ════════════════════════════════════════════════════════════════
 export default function HomeScreen() {
   const {token, checking, login} = useAuth();
+  useAutoReloadOnDeploy();
 
   if (checking) return (
     <View style={{flex:1,backgroundColor:'#0e0f12',alignItems:'center',justifyContent:'center'}}>
